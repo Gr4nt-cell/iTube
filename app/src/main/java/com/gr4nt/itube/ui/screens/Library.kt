@@ -137,7 +137,7 @@ fun LibraryScreen() {
         item {
             Group {
                 NavRow(Icons.Rounded.History, "History", "${history.size} videos") { app.push(Screen.History) }
-                NavRow(Icons.Rounded.Download, "Downloads", "${downloads.size} files") { app.selectTab(2) }
+                NavRow(Icons.Rounded.Download, "Downloads", "${downloads.size} files") { app.selectTab(3) }
                 NavRow(Icons.Rounded.Settings, "Settings") { app.push(Screen.Settings) }
             }
         }

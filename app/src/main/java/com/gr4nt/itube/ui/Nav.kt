@@ -14,6 +14,7 @@ import com.gr4nt.itube.player.PlaybackEngine
 
 sealed interface Screen {
     data object Home : Screen
+    data object Shorts : Screen
     data object Subscriptions : Screen
     data object Downloads : Screen
     data object Library : Screen
@@ -39,7 +40,7 @@ class SearchModel(initial: String) {
 
 /** UI-wide navigation and overlay state. Each tab keeps its own back stack. */
 class AppState {
-    private val roots = listOf(Screen.Home, Screen.Subscriptions, Screen.Downloads, Screen.Library)
+    private val roots = listOf(Screen.Home, Screen.Shorts, Screen.Subscriptions, Screen.Downloads, Screen.Library)
     val stacks = roots.map { mutableStateListOf<Screen>(it) }
 
     var tab by mutableIntStateOf(0)

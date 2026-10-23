@@ -12,6 +12,7 @@ import org.schabi.newpipe.extractor.Page
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.channel.ChannelInfo
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabInfo
+import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs
 import org.schabi.newpipe.extractor.comments.CommentsInfo
 import org.schabi.newpipe.extractor.comments.CommentsInfoItem
 import org.schabi.newpipe.extractor.feed.FeedInfo
@@ -137,6 +138,58 @@ object Repo {
         val max = lists.maxOfOrNull { it.size } ?: 0
         for (i in 0 until max) lists.forEach { l -> l.getOrNull(i)?.let(out::add) }
         out.distinctBy { it.url }
+    }
+
+    // ---------------- Shorts ----------------
+
+    private fun isShortLike(v: VideoItem) = !v.isLive && (v.isShort || v.durationSec in 1..180)
+
+    private val shortQueries = listOf("#shorts", "shorts funny", "shorts music", "shorts trending", "shorts gaming", "shorts sports")
+
+    /** Shorts feed: shorts from your subscriptions mixed with popular shorts, endlessly paged. */
+    suspend fun shorts(subs: List<ChannelItem>): PageResult<Item> = coroutineScope {
+        val query = shortQueries.random()
+        val searchDef = async { runCatching { search(query, "videos") }.getOrNull() }
+        val subsDef = async { subscriptionShorts(subs.shuffled().take(12)) }
+        val first = searchDef.await()
+        val fromSearch = first?.items.orEmpty().filterIsInstance<VideoItem>().filter(::isShortLike)
+        val fromSubs = subsDef.await().shuffled()
+        val merged = mutableListOf<VideoItem>()
+        val n = maxOf(fromSearch.size, fromSubs.size)
+        for (i in 0 until n) {
+            fromSubs.getOrNull(i)?.let(merged::add)
+            fromSearch.getOrNull(i)?.let(merged::add)
+        }
+        PageResult<Item>(merged.distinctBy { it.url }, first?.next?.let { shortsNext(it, 0) })
+    }
+
+    private fun shortsNext(next: suspend () -> PageResult<Item>, empties: Int): suspend () -> PageResult<Item> = {
+        val p = next()
+        val items = p.items.filterIsInstance<VideoItem>().filter(::isShortLike)
+        val more = p.next
+        val nextEmpties = if (items.isEmpty()) empties + 1 else 0
+        // Fall back to a fresh query when a search runs dry.
+        val following: (suspend () -> PageResult<Item>)? = when {
+            more != null && nextEmpties < 3 -> shortsNext(more, nextEmpties)
+            else -> suspend { shorts(emptyList()) }
+        }
+        PageResult<Item>(items, following)
+    }
+
+    private suspend fun subscriptionShorts(subs: List<ChannelItem>): List<VideoItem> = coroutineScope {
+        val gate = Semaphore(6)
+        subs.map { ch ->
+            async {
+                gate.withPermit {
+                    runCatching {
+                        val info = ChannelInfo.getInfo(yt, ch.url)
+                        val tab = info.tabs.firstOrNull { it.contentFilters.contains(ChannelTabs.SHORTS) } ?: return@runCatching emptyList<VideoItem>()
+                        ChannelTabInfo.getInfo(yt, tab).relatedItems.toItems().filterIsInstance<VideoItem>().take(8)
+                            .map { it.copy(isShort = true, uploader = it.uploader.ifEmpty { ch.title }, uploaderUrl = it.uploaderUrl ?: ch.url, uploaderAvatar = it.uploaderAvatar ?: ch.thumbnail) }
+                    }.getOrDefault(emptyList())
+                }
+            }
+        }.awaitAll().flatten()
     }
 
     suspend fun suggestions(query: String): List<String> = io {

@@ -179,7 +179,7 @@ fun ProfileScreen() {
         item { SectionLabel("App") }
         item {
             Card {
-                ProfileRow(Icons.Rounded.Download, "Downloads") { app.selectTab(2) }
+                ProfileRow(Icons.Rounded.Download, "Downloads") { app.selectTab(3) }
                 ProfileRow(Icons.Rounded.Settings, "Settings") { app.push(Screen.Settings) }
                 if (cookies != null) {
                     ProfileRow(Icons.AutoMirrored.Rounded.Logout, "Sign out") {

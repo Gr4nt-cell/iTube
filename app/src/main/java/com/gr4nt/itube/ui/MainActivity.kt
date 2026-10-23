@@ -36,10 +36,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Slideshow
 import androidx.compose.material.icons.outlined.Subscriptions
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Slideshow
 import androidx.compose.material.icons.rounded.Subscriptions
 import androidx.compose.material.icons.rounded.VideoLibrary
 import androidx.compose.material3.MaterialTheme
@@ -214,6 +216,7 @@ class MainActivity : ComponentActivity() {
 
 private val tabs = listOf(
     TabSpec("Home", Icons.Outlined.Home, Icons.Rounded.Home),
+    TabSpec("Shorts", Icons.Outlined.Slideshow, Icons.Rounded.Slideshow),
     TabSpec("Subscriptions", Icons.Outlined.Subscriptions, Icons.Rounded.Subscriptions),
     TabSpec("Downloads", Icons.Outlined.Download, Icons.Rounded.Download),
     TabSpec("Library", Icons.Outlined.VideoLibrary, Icons.Rounded.VideoLibrary),
@@ -254,7 +257,7 @@ private fun MainActivity.Root(app: AppState, onExit: () -> Unit) {
                         Crossfade(targetState = app.current, label = "screen") { screen -> ScreenContent(screen) }
                     }
                     // Soft scrim so the floating header stays legible over content.
-                    Box(
+                    if (app.current != Screen.Shorts) Box(
                         Modifier
                             .fillMaxWidth()
                             .height(statusTop + 24.dp)
@@ -268,7 +271,7 @@ private fun MainActivity.Root(app: AppState, onExit: () -> Unit) {
                             .navigationBarsPadding()
                             .padding(start = 14.dp, end = 14.dp, bottom = 8.dp),
                     ) {
-                        if (current != null && !app.playerExpanded) MiniPlayer(Modifier.padding(bottom = 10.dp))
+                        if (current != null && !app.playerExpanded && app.current != Screen.Shorts) MiniPlayer(Modifier.padding(bottom = 10.dp))
                         GlassTabBar(tabs, app.tab, { app.selectTab(it) })
                     }
                 }
@@ -294,6 +297,7 @@ private fun MainActivity.Root(app: AppState, onExit: () -> Unit) {
 private fun ScreenContent(screen: Screen) {
     when (screen) {
         Screen.Home -> HomeScreen()
+        Screen.Shorts -> com.gr4nt.itube.ui.screens.ShortsScreen()
         Screen.Subscriptions -> SubscriptionsScreen()
         Screen.Downloads -> DownloadsScreen()
         Screen.Library -> LibraryScreen()
@@ -314,6 +318,7 @@ private fun ScreenHeader(screen: Screen) {
     val back = { app.back(); Unit }
     when (screen) {
         Screen.Home -> RootHeader("iTube")
+        Screen.Shorts -> Unit
         Screen.Subscriptions -> RootHeader("Subs")
         Screen.Downloads -> RootHeader("Saved")
         Screen.Library -> RootHeader("Library")
