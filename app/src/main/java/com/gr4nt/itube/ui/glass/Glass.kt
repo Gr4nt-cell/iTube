@@ -97,8 +97,9 @@ fun Modifier.liquidGlass(
         Modifier.background(c.elevated.copy(alpha = 0.94f), shape)
     }
     return this
-        .shadow(elevation, shape, clip = false, ambientColor = c.shadow, spotColor = c.shadow)
+        .depthShadow(shape, elevation)
         .then(glass)
+        .then(if (!c.dark) Modifier.border(0.7.dp, Color.Black.copy(alpha = 0.10f), shape) else Modifier)
         .border(0.8.dp, rim, shape)
         .clip(shape)
 }
@@ -114,8 +115,9 @@ fun Modifier.frosted(shape: RoundedCornerShape, elevation: Dp = 8.dp): Modifier 
         Brush.linearGradient(listOf(c.glassRim.copy(alpha = 0.9f), c.glassRim.copy(alpha = 0.05f)))
     }
     return this
-        .shadow(elevation, shape, clip = false, ambientColor = c.shadow, spotColor = c.shadow)
+        .depthShadow(shape, elevation)
         .background(c.elevated.copy(alpha = if (c.dark) 0.78f else 0.86f), shape)
+        .then(if (!c.dark) Modifier.border(0.6.dp, Color.Black.copy(alpha = 0.08f), shape) else Modifier)
         .border(0.6.dp, rim, shape)
         .clip(shape)
 }
@@ -192,7 +194,7 @@ fun GlassChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Mo
         modifier = modifier
             .pressScale(interaction)
             .height(36.dp)
-            .shadow(if (selected) 10.dp else 4.dp, shape, clip = false, ambientColor = glow, spotColor = glow)
+            .depthShadow(shape, if (selected) 10.dp else 6.dp, tint = if (selected) glow else null)
             .background(bg, shape)
             .border(0.6.dp, c.glassRim.copy(alpha = if (selected) 0.5f else 0.35f), shape)
             .clip(shape)
@@ -270,7 +272,7 @@ fun GlassTabBar(
                     scaleX = lens
                     scaleY = lens
                 }
-                .shadow(if (dragging) 14.dp else 2.dp, lensShape, clip = false, ambientColor = c.shadow, spotColor = c.shadow)
+                .depthShadow(lensShape, if (dragging) 14.dp else 4.dp)
                 .background(c.label.copy(alpha = if (dragging) 0.16f else 0.09f), lensShape)
                 .border(
                     0.8.dp,
