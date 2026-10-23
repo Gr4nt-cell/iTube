@@ -10,6 +10,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -41,8 +45,22 @@ jobs:
           ITUBE_KEY_ALIAS: ${{ secrets.ITUBE_KEY_ALIAS }}
           ITUBE_KEY_PASSWORD: ${{ secrets.ITUBE_KEY_PASSWORD }}
         run: |
+          set -o pipefail
           chmod +x gradlew
-          ./gradlew --stacktrace assembleRelease
+          ./gradlew --stacktrace assembleRelease 2>&1 | tee build.log
+
+      - name: Save build log on failure
+        if: failure()
+        run: |
+          grep -nE "^e: |error:|FAILURE|What went wrong|Could not|> " build.log | head -300 > failure.txt || true
+          tail -150 build.log >> failure.txt || true
+          git config user.name "ci"
+          git config user.email "ci@users.noreply.github.com"
+          git checkout --orphan ci-logs
+          git rm -rf --cached . > /dev/null
+          git add -f failure.txt
+          git commit -m "Build log for ${{ github.sha }}"
+          git push -f origin ci-logs
 
       - name: Rename APK
         run: |
