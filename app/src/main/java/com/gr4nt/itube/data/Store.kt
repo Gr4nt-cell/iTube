@@ -102,6 +102,14 @@ object Store {
         if (list.any { it.url == channel.url }) list.filterNot { it.url == channel.url } else list + channel
     }
 
+    /** Adds channels that aren't subscribed yet; returns how many were added. */
+    fun importSubscriptions(channels: List<ChannelItem>): Int {
+        val existing = subsP.flow.value.map { it.url }.toSet()
+        val fresh = channels.filter { it.url !in existing }.distinctBy { it.url }
+        if (fresh.isNotEmpty()) mutate(subsP) { it + fresh }
+        return fresh.size
+    }
+
     // History & resume
     fun addHistory(video: VideoItem) = mutate(historyP) { list ->
         (listOf(HistoryEntry(video, System.currentTimeMillis())) + list.filterNot { it.video.url == video.url }).take(500)

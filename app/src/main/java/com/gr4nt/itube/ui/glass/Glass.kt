@@ -1,7 +1,26 @@
 package com.gr4nt.itube.ui.glass
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.IntOffset
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -163,26 +182,24 @@ fun GlassChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Mo
     val c = AppTheme.colors
     val interaction = remember { MutableInteractionSource() }
     val shape = RoundedCornerShape(18.dp)
+    val bg by animateColorAsState(if (selected) c.accent else c.elevated.copy(alpha = if (c.dark) 0.78f else 0.86f), label = "chipBg")
+    val fg by animateColorAsState(if (selected) Color.White else c.label, label = "chipFg")
+    val glow = if (selected) c.accent.copy(alpha = 0.7f) else c.shadow
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .pressScale(interaction)
             .height(36.dp)
-            .then(
-                if (selected) {
-                    Modifier
-                        .shadow(10.dp, shape, ambientColor = c.accent, spotColor = c.accent)
-                        .background(c.accent, shape)
-                } else {
-                    Modifier.frosted(shape, elevation = 4.dp)
-                }
-            )
+            .shadow(if (selected) 10.dp else 4.dp, shape, clip = false, ambientColor = glow, spotColor = glow)
+            .background(bg, shape)
+            .border(0.6.dp, c.glassRim.copy(alpha = if (selected) 0.5f else 0.35f), shape)
+            .clip(shape)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = 16.dp),
     ) {
         Text(
             text,
-            color = if (selected) Color.White else c.label,
+            color = fg,
             fontWeight = FontWeight.SemiBold,
             style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
         )
@@ -191,7 +208,10 @@ fun GlassChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Mo
 
 data class TabSpec(val label: String, val icon: ImageVector, val selectedIcon: ImageVector)
 
-/** Floating Liquid Glass tab bar. */
+/**
+ * Floating Liquid Glass tab bar. The selection highlight is a glass lens you can drag across
+ * the tabs; it magnifies while held and snaps to the nearest tab on release.
+ */
 @Composable
 fun GlassTabBar(
     tabs: List<TabSpec>,
@@ -201,42 +221,105 @@ fun GlassTabBar(
 ) {
     val c = AppTheme.colors
     val shape = RoundedCornerShape(32.dp)
-    Row(
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
+    val lensShape = RoundedCornerShape(27.dp)
+    val density = LocalDensity.current
+    val haptics = LocalHapticFeedback.current
+    val currentOnSelect by rememberUpdatedState(onSelect)
+    val currentSelected by rememberUpdatedState(selected)
+    BoxWithConstraints(
+        modifier
             .fillMaxWidth()
             .height(64.dp)
             .liquidGlass(shape, elevation = 20.dp)
-            .padding(horizontal = 6.dp),
+            .padding(5.dp),
     ) {
-        tabs.forEachIndexed { i, tab ->
-            val isSel = i == selected
-            val interaction = remember { MutableInteractionSource() }
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-                modifier = Modifier
-                    .weight(1f)
-                    .pressScale(interaction)
-                    .height(54.dp)
-                    .clip(RoundedCornerShape(27.dp))
-                    .background(if (isSel) c.label.copy(alpha = 0.08f) else Color.Transparent)
-                    .clickable(interactionSource = interaction, indication = null) { onSelect(i) },
-            ) {
-                Icon(
-                    if (isSel) tab.selectedIcon else tab.icon,
-                    contentDescription = tab.label,
-                    tint = if (isSel) c.accent else c.label,
-                    modifier = Modifier.size(24.dp),
-                )
-                Text(
-                    tab.label,
-                    color = if (isSel) c.accent else c.label,
-                    style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+        val count = tabs.size.coerceAtLeast(1)
+        val tabW = maxWidth / count
+        val tabWpx = with(density) { tabW.toPx() }
+        val maxOffset = (count - 1) * tabWpx
+        val scope = rememberCoroutineScope()
+        val offset = remember { Animatable(selected * tabWpx) }
+        var dragging by remember { mutableStateOf(false) }
+        val snapSpec = spring<Float>(dampingRatio = 0.68f, stiffness = 420f)
+
+        LaunchedEffect(selected, tabWpx) {
+            if (!dragging) offset.animateTo(selected * tabWpx, snapSpec)
+        }
+        val lens by animateFloatAsState(if (dragging) 1.14f else 1f, spring(dampingRatio = 0.55f, stiffness = 500f), label = "lens")
+        val hovered = ((offset.value + tabWpx / 2) / tabWpx).toInt().coerceIn(0, count - 1)
+        LaunchedEffect(hovered) {
+            if (dragging) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+
+        fun settle() {
+            dragging = false
+            val target = ((offset.value + tabWpx / 2) / tabWpx).toInt().coerceIn(0, count - 1)
+            scope.launch { offset.animateTo(target * tabWpx, snapSpec) }
+            if (target != currentSelected) currentOnSelect(target)
+        }
+
+        // The glass lens
+        Box(
+            Modifier
+                .offset { IntOffset(offset.value.roundToInt(), 0) }
+                .width(tabW)
+                .fillMaxHeight()
+                .graphicsLayer {
+                    scaleX = lens
+                    scaleY = lens
+                }
+                .shadow(if (dragging) 14.dp else 2.dp, lensShape, clip = false, ambientColor = c.shadow, spotColor = c.shadow)
+                .background(c.label.copy(alpha = if (dragging) 0.16f else 0.09f), lensShape)
+                .border(
+                    0.8.dp,
+                    Brush.linearGradient(listOf(c.glassRim, c.glassRim.copy(alpha = 0.08f), c.glassRim.copy(alpha = 0.5f))),
+                    lensShape,
+                ),
+        )
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(count, tabWpx) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { dragging = true },
+                        onDragEnd = { settle() },
+                        onDragCancel = { settle() },
+                        onHorizontalDrag = { change, amount ->
+                            change.consume()
+                            scope.launch { offset.snapTo((offset.value + amount).coerceIn(0f, maxOffset)) }
+                        },
+                    )
+                },
+        ) {
+            tabs.forEachIndexed { i, tab ->
+                val active = if (dragging) i == hovered else i == selected
+                val interaction = remember { MutableInteractionSource() }
+                val tint by animateColorAsState(if (active) c.accent else c.label, label = "tabTint")
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .pressScale(interaction)
+                        .clickable(interactionSource = interaction, indication = null) { onSelect(i) },
+                ) {
+                    Icon(
+                        if (active) tab.selectedIcon else tab.icon,
+                        contentDescription = tab.label,
+                        tint = tint,
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Text(
+                        tab.label,
+                        color = tint,
+                        style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }

@@ -303,6 +303,8 @@ private fun ScreenContent(screen: Screen) {
         is Screen.Channel -> ChannelScreen(screen.url)
         is Screen.Playlist -> PlaylistScreen(screen.url)
         is Screen.LocalList -> LocalListScreen(screen.id)
+        Screen.Profile -> com.gr4nt.itube.ui.screens.ProfileScreen()
+        is Screen.AccountFeed -> com.gr4nt.itube.ui.screens.AccountFeedScreen(screen.kind)
     }
 }
 
@@ -321,6 +323,8 @@ private fun ScreenHeader(screen: Screen) {
         is Screen.Channel -> FloatingHeader("Channel", onBack = back)
         is Screen.Playlist -> FloatingHeader("Playlist", onBack = back)
         is Screen.LocalList -> FloatingHeader("Playlist", onBack = back)
+        Screen.Profile -> FloatingHeader("Account", onBack = back)
+        is Screen.AccountFeed -> FloatingHeader(com.gr4nt.itube.ui.screens.accountFeedTitle(screen.kind), onBack = back)
     }
 }
 

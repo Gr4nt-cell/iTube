@@ -36,7 +36,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.rounded.AccountCircle
+import com.gr4nt.itube.data.Account
 import com.gr4nt.itube.data.Repo
+import com.gr4nt.itube.net.Innertube
+import com.gr4nt.itube.ui.glass.liquidGlass
+import com.gr4nt.itube.ui.glass.pressScale
 import com.gr4nt.itube.data.Store
 import com.gr4nt.itube.data.VideoItem
 import com.gr4nt.itube.ui.LocalAppState
@@ -82,19 +89,59 @@ fun RootHeader(title: String) {
             Text("Search YouTube", color = c.secondaryLabel, style = MaterialTheme.typography.bodyLarge, maxLines = 1)
         }
         Spacer(Modifier.width(8.dp))
-        GlassIconButton(Icons.Rounded.Settings, "Settings", { app.push(Screen.Settings) })
+        ProfileButton { app.push(Screen.Profile) }
     }
 }
+
+/** Glass avatar button: your Google profile photo when signed in. */
+@Composable
+fun ProfileButton(onClick: () -> Unit) {
+    val profile by Account.profile.collectAsState()
+    val cookies by Account.cookies.collectAsState()
+    val avatar = profile?.avatar
+    if (cookies != null && avatar != null) {
+        val interaction = remember { MutableInteractionSource() }
+        Box(
+            Modifier
+                .pressScale(interaction)
+                .size(44.dp)
+                .liquidGlass(CircleShape, elevation = 10.dp)
+                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .padding(3.dp),
+        ) { Avatar(avatar, 38.dp) }
+    } else {
+        GlassIconButton(Icons.Rounded.AccountCircle, "Profile", onClick)
+    }
+}
+
+private data class HomeTab(val id: String, val label: String)
 
 @Composable
 fun HomeScreen() {
     val chrome = LocalChrome.current
-    var selected by rememberSaveable { mutableIntStateOf(0) }
-    val kiosk = Repo.kiosks[selected]
+    val subs by Store.subscriptions.collectAsState()
+    val cookies by Account.cookies.collectAsState()
+    val tabs = remember(cookies) {
+        buildList {
+            add(HomeTab("trending", "Trending"))
+            if (cookies != null) add(HomeTab("for_you", "For you"))
+            Repo.kiosks.forEach { add(HomeTab(it.id, it.label)) }
+        }
+    }
+    // Trending (index 0) is what the app opens on.
+    var selectedId by rememberSaveable { mutableStateOf("trending") }
+    val tab = tabs.firstOrNull { it.id == selectedId } ?: tabs.first()
+    val subsKey = subs.map { it.url }.toSet()
     Box(Modifier.fillMaxSize()) {
         PagedList(
-            key = kiosk.id,
-            load = { Repo.kiosk(kiosk.id) },
+            key = if (tab.id == "trending") tab.id to subsKey else tab.id,
+            load = {
+                when (tab.id) {
+                    "trending" -> Repo.trending(subs)
+                    "for_you" -> Innertube.recommendations()
+                    else -> Repo.kiosk(tab.id)
+                }
+            },
             contentPadding = PaddingValues(top = chrome.top, bottom = chrome.bottom),
         ) {
             item {
@@ -102,9 +149,20 @@ fun HomeScreen() {
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(Repo.kiosks.size) { i ->
-                        GlassChip(Repo.kiosks[i].label, i == selected, { selected = i })
+                    items(tabs.size) { i ->
+                        GlassChip(tabs[i].label, tabs[i].id == tab.id, { selectedId = tabs[i].id })
                     }
+                }
+            }
+            if (tab.id == "trending") {
+                item {
+                    Text(
+                        if (subs.isEmpty()) "Top charts right now · subscribe to channels to personalise"
+                        else "Rising fastest across your ${subs.size} subscriptions",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppTheme.colors.secondaryLabel,
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 2.dp),
+                    )
                 }
             }
         }
@@ -117,6 +175,17 @@ fun SubscriptionsScreen() {
     val chrome = LocalChrome.current
     val c = AppTheme.colors
     val subs by Store.subscriptions.collectAsState()
+    val cookies by Account.cookies.collectAsState()
+    if (cookies != null) {
+        PagedList(
+            key = "account_subs",
+            load = { Innertube.subscriptionFeed() },
+            contentPadding = PaddingValues(top = chrome.top, bottom = chrome.bottom),
+        ) {
+            if (subs.isNotEmpty()) item { SubsAvatarRow(subs) }
+        }
+        return
+    }
     var feed by remember { mutableStateOf<List<VideoItem>?>(null) }
     var refresh by remember { mutableIntStateOf(0) }
 
@@ -142,33 +211,7 @@ fun SubscriptionsScreen() {
         contentPadding = PaddingValues(top = chrome.top, bottom = chrome.bottom),
         modifier = Modifier.fillMaxSize(),
     ) {
-        if (subs.isNotEmpty()) {
-            item {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    items(subs) { ch ->
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .width(68.dp)
-                                .clickable { app.push(Screen.Channel(ch.url)) },
-                        ) {
-                            Avatar(ch.thumbnail, 58.dp)
-                            Text(
-                                ch.title,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = c.secondaryLabel,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(top = 4.dp),
-                            )
-                        }
-                    }
-                }
-            }
-        }
+        if (subs.isNotEmpty()) item { SubsAvatarRow(subs) }
         val f = feed
         when {
             subs.isEmpty() -> item {
@@ -177,6 +220,35 @@ fun SubscriptionsScreen() {
             f == null -> item { LoadingBox() }
             f.isEmpty() -> item { EmptyBox("No new videos") }
             else -> items(f) { v -> VideoCard(v, f) }
+        }
+    }
+}
+
+@Composable
+private fun SubsAvatarRow(subs: List<com.gr4nt.itube.data.ChannelItem>) {
+    val app = LocalAppState.current
+    val c = AppTheme.colors
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        items(subs) { ch ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .width(68.dp)
+                    .clickable { app.push(Screen.Channel(ch.url)) },
+            ) {
+                Avatar(ch.thumbnail, 58.dp)
+                Text(
+                    ch.title,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = c.secondaryLabel,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
         }
     }
 }

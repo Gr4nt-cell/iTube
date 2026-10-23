@@ -1,6 +1,11 @@
 package com.gr4nt.itube.data
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.schabi.newpipe.extractor.InfoItem
 import org.schabi.newpipe.extractor.Page
@@ -57,6 +62,7 @@ object Repo {
 
     suspend fun kiosk(id: String): PageResult<Item> = io {
         val extractor = yt.kioskList.getExtractorById(id, null)
+        extractor.fetchPage()
         val info = KioskInfo.getInfo(extractor)
         PageResult(info.relatedItems.map { it as InfoItem }.toItems(), nextKiosk(info.url, info.nextPage))
     }
@@ -69,6 +75,68 @@ object Repo {
                 PageResult(p.items.map { it as InfoItem }.toItems(), nextKiosk(url, p.nextPage))
             }
         }
+    }
+
+    private var trendingCache: Pair<Long, List<VideoItem>>? = null
+    private var trendingKey: Set<String> = emptySet()
+
+    /**
+     * "Trending" built from your subscriptions: recent uploads from every subscribed channel,
+     * ranked by how quickly they're gaining views (views ÷ age^1.4). Without subscriptions it
+     * falls back to a mix of YouTube's music, gaming and movie charts.
+     */
+    suspend fun trending(subs: List<ChannelItem>, force: Boolean = false): PageResult<Item> = io {
+        val key = subs.map { it.url }.toSet()
+        val cached = trendingCache
+        if (!force && cached != null && key == trendingKey && System.currentTimeMillis() - cached.first < 10 * 60_000) {
+            return@io PageResult<Item>(cached.second, null)
+        }
+        val list = if (subs.isEmpty()) chartsMix() else rankSubscriptions(subs)
+        trendingCache = System.currentTimeMillis() to list
+        trendingKey = key
+        PageResult<Item>(list, null)
+    }
+
+    private suspend fun rankSubscriptions(subs: List<ChannelItem>): List<VideoItem> = coroutineScope {
+        val gate = Semaphore(8)
+        val now = System.currentTimeMillis()
+        val all = subs.map { ch ->
+            async {
+                gate.withPermit {
+                    runCatching { feed(ch.url) }.getOrDefault(emptyList()).map {
+                        it.copy(uploaderAvatar = it.uploaderAvatar ?: ch.thumbnail, uploaderUrl = it.uploaderUrl ?: ch.url)
+                    }
+                }
+            }
+        }.awaitAll().flatten().distinctBy { it.url }
+
+        val windowMs = 10L * 24 * 3_600_000
+        val recent = all.filter { it.timestamp == 0L || now - it.timestamp < windowMs }.ifEmpty { all }
+        recent.map { v ->
+            val ageHours = if (v.timestamp > 0) ((now - v.timestamp) / 3_600_000.0).coerceAtLeast(0.5) else 96.0
+            val views = v.views.coerceAtLeast(0).toDouble()
+            v to (views + 50) / Math.pow(ageHours + 2, 1.4)
+        }.sortedByDescending { it.second }
+            .map { it.first }
+            // Keep a single channel from flooding the top.
+            .let { ranked ->
+                val perChannel = HashMap<String, Int>()
+                ranked.filter { v -> (perChannel.merge(v.uploader, 1) { a, b -> a + b } ?: 1) <= 3 } +
+                    ranked.filter { v -> (perChannel[v.uploader] ?: 0) > 3 }.drop(0)
+            }
+            .distinctBy { it.url }
+            .take(150)
+    }
+
+    private suspend fun chartsMix(): List<VideoItem> = coroutineScope {
+        val lists = listOf("trending_music", "trending_gaming", "trending_movies_and_shows", "trending_podcasts_episodes").map { id ->
+            async { runCatching { kiosk(id).items.filterIsInstance<VideoItem>() }.getOrDefault(emptyList()) }
+        }.awaitAll()
+        // Interleave the charts.
+        val out = mutableListOf<VideoItem>()
+        val max = lists.maxOfOrNull { it.size } ?: 0
+        for (i in 0 until max) lists.forEach { l -> l.getOrNull(i)?.let(out::add) }
+        out.distinctBy { it.url }
     }
 
     suspend fun suggestions(query: String): List<String> = io {

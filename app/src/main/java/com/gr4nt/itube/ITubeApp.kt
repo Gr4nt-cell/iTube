@@ -33,6 +33,7 @@ class ITubeApp : Application(), SingletonImageLoader.Factory {
         instance = this
         Settings.init(this)
         Store.init(this)
+        com.gr4nt.itube.data.Account.init(this)
 
         val locale = Locale.getDefault()
         val country = locale.country.ifBlank { "US" }

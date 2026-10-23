@@ -26,6 +26,9 @@ sealed interface Screen {
     data class Channel(val url: String) : Screen
     data class Playlist(val url: String) : Screen
     data class LocalList(val id: String) : Screen
+    data object Profile : Screen
+    /** Signed-in YouTube lists: "history", "watch_later", "liked". */
+    data class AccountFeed(val kind: String) : Screen
 }
 
 class SearchModel(initial: String) {
