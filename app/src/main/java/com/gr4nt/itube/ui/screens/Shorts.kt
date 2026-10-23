@@ -223,7 +223,7 @@ private fun ShortPage(video: VideoItem, isCurrent: Boolean) {
             AsyncImage(
                 model = video.thumbnail?.replace("hqdefault", "oardefault") ?: video.thumbnail,
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize(),
             )
             if (active) {
@@ -231,7 +231,7 @@ private fun ShortPage(video: VideoItem, isCurrent: Boolean) {
                     modifier = Modifier.fillMaxSize(),
                     factory = { c ->
                         (LayoutInflater.from(c).inflate(R.layout.player_surface, null) as PlayerView).apply {
-                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                             setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
                         }
                     },
