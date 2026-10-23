@@ -20,9 +20,8 @@ import androidx.compose.ui.unit.dp
 import com.gr4nt.itube.ui.theme.AppTheme
 
 /**
- * Depth shadow for floating UI. In light mode Android's elevation shadows are very faint, so we
- * draw two blurred layers ourselves: a tight contact shadow hugging the edges and a soft, offset
- * drop shadow. Dark mode keeps the platform elevation shadow.
+ * Edge shadow for floating UI in light mode: a crisp contact line plus a soft halo drawn only
+ * outside the element's outline. Dark mode keeps the platform elevation shadow.
  */
 @Composable
 fun Modifier.depthShadow(shape: Shape, elevation: Dp, tint: Color? = null): Modifier {
@@ -32,13 +31,32 @@ fun Modifier.depthShadow(shape: Shape, elevation: Dp, tint: Color? = null): Modi
         val col = tint ?: c.shadow
         return this.shadow(elevation, shape, clip = false, ambientColor = col, spotColor = col)
     }
-    val strength = (elevation.value / 14f).coerceIn(0.35f, 1.6f)
+    val strength = (elevation.value / 14f).coerceIn(0.4f, 1.5f)
     val base = tint ?: Color.Black
     return this.drawBehind {
-        // Soft ambient drop shadow
-        blurredShape(shape, base.copy(alpha = (0.20f * strength).coerceAtMost(0.32f)), blur = elevation * 1.4f, dy = elevation * 0.45f, spread = 0.dp)
-        // Tight contact shadow that outlines the edges
-        blurredShape(shape, base.copy(alpha = (0.22f * strength).coerceAtMost(0.30f)), blur = 3.dp, dy = 1.dp, spread = 0.5.dp)
+        // Clip the element's own area out so the shadow only appears around its edges,
+        // never showing through the translucent glass.
+        val outline = shape.createOutline(size, layoutDirection, this)
+        val clip = android.graphics.Path().apply {
+            when (outline) {
+                is Outline.Rounded -> {
+                    val r = outline.roundRect
+                    addRoundRect(r.left, r.top, r.right, r.bottom, r.topLeftCornerRadius.x, r.topLeftCornerRadius.y, android.graphics.Path.Direction.CW)
+                }
+                is Outline.Rectangle -> addRect(outline.rect.left, outline.rect.top, outline.rect.right, outline.rect.bottom, android.graphics.Path.Direction.CW)
+                is Outline.Generic -> addPath(outline.path.asAndroidPath())
+            }
+        }
+        drawIntoCanvas { canvas ->
+            val native = canvas.nativeCanvas
+            native.save()
+            native.clipOutPath(clip)
+            // Soft halo around the edges
+            blurredShape(shape, base.copy(alpha = (0.16f * strength).coerceAtMost(0.26f)), blur = elevation * 0.9f, dy = elevation * 0.12f, spread = 0.dp)
+            // Crisp contact line hugging the edge
+            blurredShape(shape, base.copy(alpha = (0.26f * strength).coerceAtMost(0.34f)), blur = 2.dp, dy = 0.dp, spread = 0.6.dp)
+            native.restore()
+        }
     }
 }
 
