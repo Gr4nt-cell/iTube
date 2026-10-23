@@ -62,7 +62,7 @@ object Repo {
     }
 
     private fun nextKiosk(url: String, page: Page?): (suspend () -> PageResult<Item>)? {
-        if (!Page.isValid(page)) return null
+        if (page == null || !Page.isValid(page)) return null
         return {
             io {
                 val p = KioskInfo.getMoreItems(yt, url, page)
@@ -84,7 +84,7 @@ object Repo {
         )
         val info = SearchInfo.getInfo(yt, handler)
         fun next(page: Page?): (suspend () -> PageResult<Item>)? {
-            if (!Page.isValid(page)) return null
+            if (page == null || !Page.isValid(page)) return null
             return {
                 io {
                     val p = SearchInfo.getMoreItems(yt, handler, page)
@@ -105,7 +105,7 @@ object Repo {
     suspend fun channelTab(tab: ListLinkHandler): PageResult<Item> = io {
         val info = ChannelTabInfo.getInfo(yt, tab)
         fun next(page: Page?): (suspend () -> PageResult<Item>)? {
-            if (!Page.isValid(page)) return null
+            if (page == null || !Page.isValid(page)) return null
             return {
                 io {
                     val p = ChannelTabInfo.getMoreItems(yt, tab, page)
@@ -119,7 +119,7 @@ object Repo {
     suspend fun playlist(url: String): Pair<PlaylistInfo, PageResult<Item>> = io {
         val info = PlaylistInfo.getInfo(yt, url)
         fun next(page: Page?): (suspend () -> PageResult<Item>)? {
-            if (!Page.isValid(page)) return null
+            if (page == null || !Page.isValid(page)) return null
             return {
                 io {
                     val p = PlaylistInfo.getMoreItems(yt, url, page)
@@ -133,7 +133,7 @@ object Repo {
     suspend fun comments(videoUrl: String): Pair<Boolean, PageResult<Comment>> = io {
         val info = CommentsInfo.getInfo(yt, videoUrl)
         fun next(page: Page?): (suspend () -> PageResult<Comment>)? {
-            if (!Page.isValid(page)) return null
+            if (page == null || !Page.isValid(page)) return null
             return {
                 io {
                     val p = CommentsInfo.getMoreItems(yt, videoUrl, page)
