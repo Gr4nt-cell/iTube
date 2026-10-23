@@ -27,7 +27,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,10 +62,14 @@ fun Thumb(
 ) {
     val shape = RoundedCornerShape(corner)
     Box(modifier.aspectRatio(16f / 9f).clip(shape).background(AppTheme.colors.chip)) {
+        // Load YouTube's 1280×720 thumbnail; fall back through smaller sizes when it doesn't exist.
+        val candidates = remember(url) { thumbnailCandidates(url) }
+        var attempt by remember(url) { mutableIntStateOf(0) }
         AsyncImage(
-            model = url,
+            model = candidates.getOrNull(attempt) ?: url,
             contentDescription = null,
             contentScale = ContentScale.Crop,
+            onError = { if (attempt < candidates.lastIndex) attempt++ },
             modifier = Modifier.fillMaxSize(),
         )
         val badge = if (live) "LIVE" else duration
@@ -96,6 +103,21 @@ fun Thumb(
             )
         }
     }
+}
+
+private val videoIdInThumb = Regex("/vi(?:_webp)?/([A-Za-z0-9_-]{11})/")
+
+/** Highest-resolution YouTube thumbnail URLs first, then the original. */
+fun thumbnailCandidates(url: String?): List<String> {
+    if (url == null) return emptyList()
+    val id = videoIdInThumb.find(url)?.groupValues?.get(1) ?: return listOf(url)
+    if (url.contains("oardefault") || url.contains("/shorts")) return listOf(url, "https://i.ytimg.com/vi/$id/hqdefault.jpg")
+    return listOf(
+        "https://i.ytimg.com/vi/$id/maxresdefault.jpg",
+        "https://i.ytimg.com/vi/$id/sddefault.jpg",
+        "https://i.ytimg.com/vi/$id/hqdefault.jpg",
+        url,
+    ).distinct()
 }
 
 @Composable

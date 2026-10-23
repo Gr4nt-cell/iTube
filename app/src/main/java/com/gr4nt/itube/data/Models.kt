@@ -72,7 +72,7 @@ fun InfoItem.toItem(): Item? = when (this) {
     is StreamInfoItem -> VideoItem(
         url = url,
         title = name ?: "",
-        thumbnail = thumbnails.best(),
+        thumbnail = thumbnails.largest() ?: thumbnails.best(),
         uploader = uploaderName ?: "",
         uploaderUrl = uploaderUrl,
         uploaderAvatar = uploaderAvatars.best(96),
