@@ -1,0 +1,38 @@
+workflows:
+  itube-android:
+    name: iTube Android APK
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      java: 21
+    triggering:
+      events:
+        - push
+        - tag
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+      cancel_previous_builds: true
+    cache:
+      cache_paths:
+        - $HOME/.gradle/caches
+        - $HOME/.gradle/wrapper
+    scripts:
+      - name: Set Android SDK location
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/local.properties"
+      - name: Accept Android SDK licenses
+        script: |
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      - name: Build release APK
+        script: |
+          chmod +x gradlew
+          ./gradlew --stacktrace assembleRelease
+      - name: Name the APK
+        script: |
+          mkdir -p out
+          cp app/build/outputs/apk/release/*.apk "out/iTube-cm$BUILD_NUMBER.apk"
+    artifacts:
+      - out/*.apk
+      - app/build/outputs/mapping/release/mapping.txt

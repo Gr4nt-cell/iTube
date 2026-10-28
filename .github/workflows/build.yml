@@ -1,10 +1,7 @@
 name: Build APK
 
+# Builds now run on Codemagic (codemagic.yaml). This workflow stays available to run by hand.
 on:
-  push:
-    branches: [ main, master ]
-    tags: [ 'v*' ]
-  pull_request:
   workflow_dispatch:
 
 permissions:

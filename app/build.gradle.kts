@@ -12,7 +12,10 @@ val keystoreFile = if (!envKeystore.isNullOrBlank()) file(envKeystore) else root
 val keystorePass = System.getenv("ITUBE_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() } ?: "itube-release-2026"
 val keyAliasName = System.getenv("ITUBE_KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "itube"
 val keyPass = System.getenv("ITUBE_KEY_PASSWORD")?.takeIf { it.isNotBlank() } ?: keystorePass
-val ciVersionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+// GitHub Actions run number, or Codemagic build number offset past the GitHub builds.
+val ciVersionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+    ?: System.getenv("BUILD_NUMBER")?.toIntOrNull()?.let { it + 100 }
+    ?: 1
 
 android {
     namespace = "com.gr4nt.itube"
