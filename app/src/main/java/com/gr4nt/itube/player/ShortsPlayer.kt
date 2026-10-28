@@ -32,8 +32,18 @@ object ShortsPlayer {
             )
             .setHandleAudioBecomingNoisy(true)
             .build()
-            .apply { repeatMode = Player.REPEAT_MODE_ONE }
+            .apply {
+                repeatMode = Player.REPEAT_MODE_ONE
+                addListener(object : Player.Listener {
+                    override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        _isPlaying.value = isPlaying
+                    }
+                })
+            }
     }
+
+    private val _isPlaying = MutableStateFlow(false)
+    val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
     private val _currentUrl = MutableStateFlow<String?>(null)
     val currentUrl: StateFlow<String?> = _currentUrl.asStateFlow()

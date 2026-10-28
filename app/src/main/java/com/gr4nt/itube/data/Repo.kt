@@ -98,35 +98,77 @@ object Repo {
         PageResult<Item>(list, null)
     }
 
+    /** Shorts collected while building Trending, ranked; the Shorts tab shows these first. */
+    @Volatile
+    private var trendingShorts: List<VideoItem> = emptyList()
+
+    /** A channel's own tab (videos/shorts) without loading the channel page first. */
+    private fun channelTab(channelUrl: String, tab: String) =
+        yt.channelTabLHFactory.fromQuery(yt.channelLHFactory.getId(channelUrl), listOf(tab), "")
+
+    private suspend fun channelShorts(ch: ChannelItem, limit: Int = 30): List<VideoItem> = runCatching {
+        ChannelTabInfo.getInfo(yt, channelTab(ch.url, ChannelTabs.SHORTS)).relatedItems.toItems()
+            .filterIsInstance<VideoItem>().take(limit)
+            .map {
+                it.copy(
+                    isShort = true,
+                    uploader = it.uploader.ifEmpty { ch.title },
+                    uploaderUrl = it.uploaderUrl ?: ch.url,
+                    uploaderAvatar = it.uploaderAvatar ?: ch.thumbnail,
+                )
+            }
+    }.getOrDefault(emptyList())
+
+    /** Views per hour of age, so new uploads that are taking off rise to the top. */
+    private fun score(v: VideoItem, now: Long): Double {
+        val ageHours = if (v.timestamp > 0) ((now - v.timestamp) / 3_600_000.0).coerceAtLeast(0.5) else 96.0
+        return (v.views.coerceAtLeast(0).toDouble() + 50) / Math.pow(ageHours + 2, 1.4)
+    }
+
+    private fun spreadChannels(ranked: List<VideoItem>, perChannel: Int): List<VideoItem> {
+        val counts = HashMap<String, Int>()
+        val head = mutableListOf<VideoItem>()
+        val tail = mutableListOf<VideoItem>()
+        for (v in ranked) {
+            val n = (counts[v.uploader] ?: 0) + 1
+            counts[v.uploader] = n
+            if (n <= perChannel) head += v else tail += v
+        }
+        return head + tail
+    }
+
     private suspend fun rankSubscriptions(subs: List<ChannelItem>): List<VideoItem> = coroutineScope {
         val gate = Semaphore(8)
         val now = System.currentTimeMillis()
-        val all = subs.map { ch ->
+        val perChannel = subs.map { ch ->
             async {
                 gate.withPermit {
-                    runCatching { feed(ch.url) }.getOrDefault(emptyList()).map {
-                        it.copy(uploaderAvatar = it.uploaderAvatar ?: ch.thumbnail, uploaderUrl = it.uploaderUrl ?: ch.url)
+                    val uploads = async {
+                        runCatching { feed(ch.url) }.getOrDefault(emptyList()).map {
+                            it.copy(uploaderAvatar = it.uploaderAvatar ?: ch.thumbnail, uploaderUrl = it.uploaderUrl ?: ch.url)
+                        }
                     }
+                    val shorts = async { channelShorts(ch) }
+                    uploads.await() to shorts.await()
                 }
             }
-        }.awaitAll().flatten().distinctBy { it.url }
+        }.awaitAll()
 
+        val shorts = perChannel.flatMap { it.second }.distinctBy { it.url }
+        val shortIds = shorts.mapNotNull { videoId(it.url) }.toHashSet()
+        val uploads = perChannel.flatMap { it.first }.distinctBy { it.url }
+
+        // Anything that is a Short goes to the Shorts tab, never Trending.
+        val (feedShorts, longs) = uploads.partition { v ->
+            v.isShort || (v.durationSec in 1..60) || videoId(v.url) in shortIds
+        }
         val windowMs = 10L * 24 * 3_600_000
-        val recent = all.filter { it.timestamp == 0L || now - it.timestamp < windowMs }.ifEmpty { all }
-        recent.map { v ->
-            val ageHours = if (v.timestamp > 0) ((now - v.timestamp) / 3_600_000.0).coerceAtLeast(0.5) else 96.0
-            val views = v.views.coerceAtLeast(0).toDouble()
-            v to (views + 50) / Math.pow(ageHours + 2, 1.4)
-        }.sortedByDescending { it.second }
-            .map { it.first }
-            // Keep a single channel from flooding the top.
-            .let { ranked ->
-                val perChannel = HashMap<String, Int>()
-                ranked.filter { v -> (perChannel.merge(v.uploader, 1) { a, b -> a + b } ?: 1) <= 3 } +
-                    ranked.filter { v -> (perChannel[v.uploader] ?: 0) > 3 }.drop(0)
-            }
-            .distinctBy { it.url }
-            .take(150)
+        val recentShorts = (feedShorts.map { it.copy(isShort = true) } + shorts).distinctBy { videoId(it.url) }
+        trendingShorts = spreadChannels(recentShorts.sortedByDescending { score(it, now) }, 3)
+
+        val longList = longs.filter { !it.isLive }
+        val recent = longList.filter { it.timestamp == 0L || now - it.timestamp < windowMs }.ifEmpty { longList }
+        spreadChannels(recent.sortedByDescending { score(it, now) }, 3).take(150)
     }
 
     private suspend fun chartsMix(): List<VideoItem> = coroutineScope {
@@ -137,7 +179,10 @@ object Repo {
         val out = mutableListOf<VideoItem>()
         val max = lists.maxOfOrNull { it.size } ?: 0
         for (i in 0 until max) lists.forEach { l -> l.getOrNull(i)?.let(out::add) }
-        out.distinctBy { it.url }
+        val all = out.distinctBy { it.url }
+        val (shorts, longs) = all.partition { it.isShort || it.durationSec in 1..60 }
+        trendingShorts = shorts.map { it.copy(isShort = true) }
+        longs
     }
 
     // ---------------- Shorts ----------------
@@ -146,21 +191,31 @@ object Repo {
 
     private val shortQueries = listOf("#shorts", "shorts funny", "shorts music", "shorts trending", "shorts gaming", "shorts sports")
 
-    /** Shorts feed: shorts from your subscriptions mixed with popular shorts, endlessly paged. */
+    /**
+     * Shorts feed: the Shorts pulled out of Trending (your subscriptions) come first, then
+     * popular Shorts mixed in, endlessly paged.
+     */
     suspend fun shorts(subs: List<ChannelItem>): PageResult<Item> = coroutineScope {
         val query = shortQueries.random()
         val searchDef = async { runCatching { search(query, "videos") }.getOrNull() }
-        val subsDef = async { subscriptionShorts(subs.shuffled().take(12)) }
+        val fromTrending = trendingShorts
+        val subsDef = async {
+            if (fromTrending.isNotEmpty() || subs.isEmpty()) emptyList()
+            else subscriptionShorts(subs.shuffled().take(12))
+        }
         val first = searchDef.await()
         val fromSearch = first?.items.orEmpty().filterIsInstance<VideoItem>().filter(::isShortLike)
-        val fromSubs = subsDef.await().shuffled()
-        val merged = mutableListOf<VideoItem>()
-        val n = maxOf(fromSearch.size, fromSubs.size)
+        val fromSubs = fromTrending.ifEmpty { subsDef.await().sortedByDescending { score(it, System.currentTimeMillis()) } }
+        // Subscription Shorts lead, then interleave with popular ones.
+        val lead = fromSubs.take(10)
+        val rest = fromSubs.drop(10)
+        val merged = lead.toMutableList()
+        val n = maxOf(fromSearch.size, rest.size)
         for (i in 0 until n) {
-            fromSubs.getOrNull(i)?.let(merged::add)
+            rest.getOrNull(i)?.let(merged::add)
             fromSearch.getOrNull(i)?.let(merged::add)
         }
-        PageResult<Item>(merged.distinctBy { it.url }, first?.next?.let { shortsNext(it, 0) })
+        PageResult<Item>(merged.distinctBy { videoId(it.url) ?: it.url }, first?.next?.let { shortsNext(it, 0) })
     }
 
     private fun shortsNext(next: suspend () -> PageResult<Item>, empties: Int): suspend () -> PageResult<Item> = {
@@ -178,18 +233,7 @@ object Repo {
 
     private suspend fun subscriptionShorts(subs: List<ChannelItem>): List<VideoItem> = coroutineScope {
         val gate = Semaphore(6)
-        subs.map { ch ->
-            async {
-                gate.withPermit {
-                    runCatching {
-                        val info = ChannelInfo.getInfo(yt, ch.url)
-                        val tab = info.tabs.firstOrNull { it.contentFilters.contains(ChannelTabs.SHORTS) } ?: return@runCatching emptyList<VideoItem>()
-                        ChannelTabInfo.getInfo(yt, tab).relatedItems.toItems().filterIsInstance<VideoItem>().take(8)
-                            .map { it.copy(isShort = true, uploader = it.uploader.ifEmpty { ch.title }, uploaderUrl = it.uploaderUrl ?: ch.url, uploaderAvatar = it.uploaderAvatar ?: ch.thumbnail) }
-                    }.getOrDefault(emptyList())
-                }
-            }
-        }.awaitAll().flatten()
+        subs.map { ch -> async { gate.withPermit { channelShorts(ch, 8) } } }.awaitAll().flatten()
     }
 
     suspend fun suggestions(query: String): List<String> = io {

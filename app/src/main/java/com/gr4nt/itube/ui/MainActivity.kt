@@ -65,7 +65,12 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import android.view.WindowManager
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import com.gr4nt.itube.data.LeaveAction
 import com.gr4nt.itube.data.Repo
 import com.gr4nt.itube.data.Settings
@@ -111,6 +116,7 @@ class MainActivity : ComponentActivity() {
         PlaybackEngine.ensureSession(this)
         requestRuntimePermissions()
         handleIntent(intent)
+        keepScreenOnWhilePlaying()
         setContent { Root(app, onExit = { finish() }) }
     }
 
@@ -134,6 +140,29 @@ class MainActivity : ComponentActivity() {
             Repo.isPlaylistUrl(url) && !url.contains("watch") -> app.push(Screen.Playlist(url))
             Repo.isChannelUrl(url) -> app.push(Screen.Channel(url))
             else -> Repo.videoUrlFrom(url)?.let { app.openVideo(VideoItem(url = it, title = "", thumbnail = null)) }
+        }
+    }
+
+    /**
+     * Stops the screen from turning off while a video is playing (main player, PiP or Shorts).
+     * Audio-only/background playback lets the screen sleep as normal.
+     */
+    private fun keepScreenOnWhilePlaying() {
+        lifecycleScope.launch {
+            combine(
+                PlaybackEngine.isPlaying,
+                PlaybackEngine.audioOnly,
+                PlaybackEngine.surfaceOwner,
+                com.gr4nt.itube.player.ShortsPlayer.isPlaying,
+            ) { playing, audioOnly, owner, shortsPlaying ->
+                (playing && !audioOnly && owner == SurfaceOwner.MAIN) || shortsPlaying
+            }.distinctUntilChanged().collect { keepOn ->
+                if (keepOn) {
+                    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } else {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+            }
         }
     }
 

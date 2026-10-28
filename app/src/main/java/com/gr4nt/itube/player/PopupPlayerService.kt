@@ -54,7 +54,10 @@ class PopupPlayerService : Service() {
     private val hideControls = Runnable { controls?.animate()?.alpha(0f)?.withEndAction { controls?.visibility = View.GONE }?.start() }
 
     private val listener = object : Player.Listener {
-        override fun onIsPlayingChanged(isPlaying: Boolean) = updatePlayIcon()
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            updatePlayIcon()
+            root?.keepScreenOn = isPlaying
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -158,6 +161,7 @@ class PopupPlayerService : Service() {
         controls = overlay
 
         attachGestures(frame, metrics)
+        frame.keepScreenOn = PlaybackEngine.player.isPlaying
         wm.addView(frame, params)
         root = frame
         PlaybackEngine.player.addListener(listener)
