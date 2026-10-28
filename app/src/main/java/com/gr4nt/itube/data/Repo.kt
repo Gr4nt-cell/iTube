@@ -7,6 +7,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.schabi.newpipe.extractor.InfoItem
 import org.schabi.newpipe.extractor.Page
 import org.schabi.newpipe.extractor.ServiceList
@@ -92,7 +93,10 @@ object Repo {
         if (!force && cached != null && key == trendingKey && System.currentTimeMillis() - cached.first < 10 * 60_000) {
             return@io PageResult<Item>(cached.second, null)
         }
-        val list = if (subs.isEmpty()) chartsMix() else rankSubscriptions(subs)
+        // Never leave the page empty: if your subscriptions can't be read, show the charts.
+        val fromSubs = if (subs.isEmpty()) emptyList() else runCatching { rankSubscriptions(subs) }.getOrDefault(emptyList())
+        val list = fromSubs.ifEmpty { runCatching { chartsMix() }.getOrDefault(emptyList()) }
+        if (list.isEmpty()) error("Couldn't reach YouTube. Check your connection and pull down to retry.")
         trendingCache = System.currentTimeMillis() to list
         trendingKey = key
         PageResult<Item>(list, null)
@@ -137,18 +141,36 @@ object Repo {
         return head + tail
     }
 
+    /** A channel's recent regular uploads: the fast RSS feed, or its Videos tab if the feed fails. */
+    private suspend fun channelUploads(ch: ChannelItem): List<VideoItem> {
+        val fromFeed = withTimeoutOrNull(10_000) { runCatching { feed(ch.url) }.getOrNull() }
+        val list = fromFeed?.takeIf { it.isNotEmpty() } ?: withTimeoutOrNull(12_000) {
+            runCatching {
+                ChannelTabInfo.getInfo(yt, channelTab(ch.url, ChannelTabs.VIDEOS)).relatedItems.toItems()
+                    .filterIsInstance<VideoItem>().take(20)
+            }.getOrNull()
+        }.orEmpty()
+        return list.map {
+            it.copy(
+                uploader = it.uploader.ifEmpty { ch.title },
+                uploaderAvatar = it.uploaderAvatar ?: ch.thumbnail,
+                uploaderUrl = it.uploaderUrl ?: ch.url,
+            )
+        }
+    }
+
     private suspend fun rankSubscriptions(subs: List<ChannelItem>): List<VideoItem> = coroutineScope {
-        val gate = Semaphore(8)
+        val gate = Semaphore(10)
         val now = System.currentTimeMillis()
+        // Uploads from every channel; Shorts tabs only for a sample, to keep loading quick.
+        val shortsFrom = subs.shuffled().take(25).map { it.url }.toHashSet()
         val perChannel = subs.map { ch ->
             async {
                 gate.withPermit {
-                    val uploads = async {
-                        runCatching { feed(ch.url) }.getOrDefault(emptyList()).map {
-                            it.copy(uploaderAvatar = it.uploaderAvatar ?: ch.thumbnail, uploaderUrl = it.uploaderUrl ?: ch.url)
-                        }
+                    val uploads = async { channelUploads(ch) }
+                    val shorts = async {
+                        if (ch.url in shortsFrom) withTimeoutOrNull(8_000) { channelShorts(ch) }.orEmpty() else emptyList()
                     }
-                    val shorts = async { channelShorts(ch) }
                     uploads.await() to shorts.await()
                 }
             }
@@ -160,7 +182,8 @@ object Repo {
 
         // Anything that is a Short goes to the Shorts tab, never Trending.
         val (feedShorts, longs) = uploads.partition { v ->
-            v.isShort || (v.durationSec in 1..60) || videoId(v.url) in shortIds
+            v.isShort || (v.durationSec in 1..60) || videoId(v.url) in shortIds ||
+                v.title.contains("#shorts", ignoreCase = true)
         }
         val windowMs = 10L * 24 * 3_600_000
         val recentShorts = (feedShorts.map { it.copy(isShort = true) } + shorts).distinctBy { videoId(it.url) }

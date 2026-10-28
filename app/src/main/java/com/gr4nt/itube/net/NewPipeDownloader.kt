@@ -29,7 +29,7 @@ object NewPipeDownloader : Downloader() {
             values.forEach { builder.addHeader(name, it) }
         }
 
-        Http.client.newCall(builder.build()).execute().use { response ->
+        Http.apiClient.newCall(builder.build()).execute().use { response ->
             if (response.code == 429) {
                 throw ReCaptchaException("reCaptcha challenge requested", request.url())
             }
