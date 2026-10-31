@@ -1,5 +1,7 @@
 package com.gr4nt.itube.ui.screens
 
+import androidx.compose.foundation.layout.height
+import com.gr4nt.itube.data.regularVideos
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,27 +71,33 @@ import kotlinx.coroutines.sync.withPermit
 fun RootHeader(title: String) {
     val app = LocalAppState.current
     val c = AppTheme.colors
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+    Column(
+        Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 18.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.headlineSmall,
-            color = c.label,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(end = 12.dp),
-        )
-        GlassPill(modifier = Modifier.weight(1f), onClick = { app.push(Screen.Search()) }) {
-            Icon(Icons.Rounded.Search, null, tint = c.secondaryLabel, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Search YouTube", color = c.secondaryLabel, style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.headlineLarge, color = c.label)
+                Text(
+                    when (title) {
+                        "iTube" -> "A little more worth watching."
+                        "Subs" -> "New from your favourite creators."
+                        "Saved" -> "Your videos, wherever you go."
+                        else -> "Everything you keep coming back to."
+                    },
+                    color = c.secondaryLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            ProfileButton { app.push(Screen.Profile) }
         }
-        Spacer(Modifier.width(8.dp))
-        ProfileButton { app.push(Screen.Profile) }
+        GlassPill(modifier = Modifier.fillMaxWidth(), height = 44.dp, onClick = { app.push(Screen.Search()) }) {
+            Icon(Icons.Rounded.Search, null, tint = c.secondaryLabel, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(10.dp))
+            Text("Search YouTube", color = c.secondaryLabel, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+        }
     }
 }
 
@@ -145,8 +153,16 @@ fun HomeScreen() {
             contentPadding = PaddingValues(top = chrome.top, bottom = chrome.bottom),
         ) {
             item {
+                Text(
+                    if (tab.id == "trending") "Trending now" else tab.label,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = AppTheme.colors.label,
+                    modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 10.dp),
+                )
+            }
+            item {
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(tabs.size) { i ->
@@ -204,7 +220,7 @@ fun SubscriptionsScreen() {
                     }
                 }
             }.awaitAll().flatten()
-        }.sortedByDescending { it.timestamp }.distinctBy { it.url }.take(300)
+        }.regularVideos().sortedByDescending { it.timestamp }.distinctBy { it.url }.take(300)
     }
 
     LazyColumn(

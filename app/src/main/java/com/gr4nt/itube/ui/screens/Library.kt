@@ -1,5 +1,7 @@
 package com.gr4nt.itube.ui.screens
 
+import com.gr4nt.itube.data.regularVideos
+import com.gr4nt.itube.data.isShortContent
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.clickable
@@ -91,8 +93,8 @@ private fun NavRow(icon: ImageVector, title: String, subtitle: String? = null, o
 private fun Group(content: @Composable () -> Unit) {
     Column(
         Modifier
-            .padding(horizontal = 14.dp, vertical = 6.dp)
-            .frosted(RoundedCornerShape(22.dp), elevation = 8.dp),
+            .padding(horizontal = 18.dp, vertical = 8.dp)
+            .frosted(RoundedCornerShape(28.dp), elevation = 6.dp),
     ) { content() }
 }
 
@@ -101,7 +103,8 @@ fun LibraryScreen() {
     val app = LocalAppState.current
     val chrome = LocalChrome.current
     val c = AppTheme.colors
-    val history by Store.history.collectAsState()
+    val storedHistory by Store.history.collectAsState()
+    val history = remember(storedHistory) { storedHistory.filterNot { it.video.isShortContent } }
     val playlists by Store.playlists.collectAsState()
     val downloads by Store.downloads.collectAsState()
 
@@ -148,7 +151,7 @@ fun LibraryScreen() {
                     NavRow(
                         if (pl.id == Store.WATCH_LATER) Icons.Rounded.WatchLater else Icons.AutoMirrored.Rounded.PlaylistPlay,
                         pl.name,
-                        "${pl.videos.size} videos",
+                        "${pl.videos.regularVideos().size} videos",
                     ) { app.push(Screen.LocalList(pl.id)) }
                 }
             }
@@ -160,7 +163,8 @@ fun LibraryScreen() {
 fun HistoryScreen() {
     val chrome = LocalChrome.current
     val c = AppTheme.colors
-    val history by Store.history.collectAsState()
+    val storedHistory by Store.history.collectAsState()
+    val history = remember(storedHistory) { storedHistory.filterNot { it.video.isShortContent } }
     val videos = remember(history) { history.map { it.video } }
     LazyColumn(contentPadding = PaddingValues(top = chrome.top, bottom = chrome.bottom), modifier = Modifier.fillMaxSize()) {
         if (history.isEmpty()) item { EmptyBox("No watch history") }
@@ -206,7 +210,7 @@ fun DownloadsScreen() {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                        .padding(horizontal = 18.dp, vertical = 8.dp)
                         .frosted(RoundedCornerShape(20.dp))
                         .padding(14.dp),
                 ) {

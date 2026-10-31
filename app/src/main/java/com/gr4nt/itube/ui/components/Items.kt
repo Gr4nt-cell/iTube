@@ -1,5 +1,7 @@
 package com.gr4nt.itube.ui.components
 
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -122,12 +124,13 @@ fun thumbnailCandidates(url: String?): List<String> {
 
 @Composable
 fun Avatar(url: String?, size: Dp, modifier: Modifier = Modifier) {
-    AsyncImage(
-        model = url,
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        modifier = modifier.size(size).clip(CircleShape).background(AppTheme.colors.chip),
-    )
+    Box(
+        modifier.size(size).clip(CircleShape).background(AppTheme.colors.chip),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (url == null) Icon(Icons.Rounded.Person, null, tint = AppTheme.colors.secondaryLabel, modifier = Modifier.size(size * 0.55f))
+        else AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+    }
 }
 
 @Composable
@@ -143,31 +146,29 @@ private fun progressOf(video: VideoItem): Float {
 fun VideoCard(video: VideoItem, queue: List<VideoItem>? = null, modifier: Modifier = Modifier) {
     val app = LocalAppState.current
     val c = AppTheme.colors
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(28.dp)
     val interaction = remember { MutableInteractionSource() }
     Column(
         modifier
             .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 8.dp)
-            .frosted(shape, elevation = 10.dp)
+            .padding(horizontal = 18.dp, vertical = 10.dp)
+            .frosted(shape, elevation = 6.dp)
             .combinedClickable(
                 interactionSource = interaction,
                 indication = null,
                 onClick = { app.openVideo(video, queue) },
                 onLongClick = { app.showSheet { VideoActionsSheet(video) } },
-            )
-            .padding(8.dp),
+            ),
     ) {
         Thumb(
             video.thumbnail,
             duration = Format.duration(video.durationSec),
             live = video.isLive,
             progress = progressOf(video),
+            corner = 26.dp,
         )
-        Row(Modifier.padding(start = 4.dp, top = 10.dp, bottom = 4.dp), verticalAlignment = Alignment.Top) {
-            if (video.uploaderAvatar != null) {
-                Avatar(video.uploaderAvatar, 36.dp, Modifier.padding(end = 10.dp))
-            }
+        Row(Modifier.padding(start = 14.dp, end = 6.dp, top = 14.dp, bottom = 14.dp), verticalAlignment = Alignment.Top) {
+            Avatar(video.uploaderAvatar, 34.dp, Modifier.padding(end = 10.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     video.title,
@@ -215,7 +216,7 @@ fun VideoRow(
     ) {
         Thumb(
             video.thumbnail,
-            modifier = Modifier.width(164.dp),
+            modifier = Modifier.fillMaxWidth(0.38f).widthIn(max = 180.dp),
             duration = Format.duration(video.durationSec),
             live = video.isLive,
             progress = progressOf(video),

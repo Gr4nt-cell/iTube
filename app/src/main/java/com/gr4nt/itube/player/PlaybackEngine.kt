@@ -1,5 +1,6 @@
 package com.gr4nt.itube.player
 
+import com.gr4nt.itube.data.regularVideos
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
@@ -144,7 +145,7 @@ object PlaybackEngine {
     }
 
     fun play(video: VideoItem, queue: List<VideoItem>? = null, audioOnly: Boolean = false) {
-        if (queue != null) _queue.value = queue
+        if (queue != null) _queue.value = queue.regularVideos()
         _audioOnly.value = audioOnly
         localRecord = null
         _current.value = video
@@ -189,7 +190,7 @@ object PlaybackEngine {
                 if (_queue.value.none { it.url == info.url }) {
                     // Auto-queue related videos so "next" and autoplay work.
                     _queue.value = listOf(_current.value!!) +
-                        info.relatedItems.toItems().filterIsInstance<VideoItem>().filter { !it.isLive }
+                        info.relatedItems.toItems().filterIsInstance<VideoItem>().regularVideos().filter { !it.isLive }
                 }
 
                 val built = SourceBuilder.build(context, info, Settings.quality.value, _audioOnly.value, _subtitle.value)

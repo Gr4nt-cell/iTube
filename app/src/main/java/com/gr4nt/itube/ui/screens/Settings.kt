@@ -48,8 +48,8 @@ import com.gr4nt.itube.ui.theme.AppTheme
 private fun Card(content: @Composable () -> Unit) {
     Column(
         Modifier
-            .padding(horizontal = 14.dp, vertical = 4.dp)
-            .frosted(RoundedCornerShape(22.dp), elevation = 8.dp)
+            .padding(horizontal = 18.dp, vertical = 6.dp)
+            .frosted(RoundedCornerShape(28.dp), elevation = 6.dp)
             .padding(vertical = 4.dp),
     ) { content() }
 }
@@ -99,7 +99,7 @@ private fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> U
     val c = AppTheme.colors
     Row(
         Modifier
-            .padding(horizontal = 14.dp, vertical = 6.dp)
+            .padding(horizontal = 18.dp, vertical = 8.dp)
             .fillMaxWidth()
             .height(40.dp)
             .clip(RoundedCornerShape(12.dp))

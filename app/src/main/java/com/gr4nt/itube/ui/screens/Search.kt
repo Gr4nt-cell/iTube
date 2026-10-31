@@ -68,7 +68,7 @@ private fun submitSearch(app: com.gr4nt.itube.ui.AppState, m: SearchModel, q: St
     if (query.startsWith("http")) {
         Repo.videoUrlFrom(query)?.let {
             if (!Repo.isPlaylistUrl(query) || query.contains("watch")) {
-                app.openVideo(VideoItem(url = it, title = "", thumbnail = null)); return
+                app.openVideo(VideoItem(url = it, title = "", thumbnail = null, isShort = com.gr4nt.itube.data.isShortUrl(query))); return
             }
         }
         if (Repo.isChannelUrl(query)) { app.push(Screen.Channel(query)); return }

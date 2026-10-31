@@ -98,21 +98,22 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun ShortsScreen() {
+    val seed = com.gr4nt.itube.ui.LocalAppState.current.shortsSeed
     val subs by Store.subscriptions.collectAsState()
     val scope = rememberCoroutineScope()
-    var items by remember { mutableStateOf<List<VideoItem>>(emptyList()) }
+    var items by remember(seed) { mutableStateOf(listOfNotNull(seed)) }
     var next by remember { mutableStateOf<(suspend () -> com.gr4nt.itube.data.PageResult<com.gr4nt.itube.data.Item>)?>(null) }
     var loading by remember { mutableStateOf(true) }
     var loadingMore by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var retry by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(retry) {
+    LaunchedEffect(retry, seed) {
         loading = true
         error = null
         try {
             val r = Repo.shorts(subs)
-            items = r.items.filterIsInstance<VideoItem>()
+            items = (listOfNotNull(seed) + r.items.filterIsInstance<VideoItem>()).distinctBy { Repo.videoId(it.url) ?: it.url }
             next = r.next
         } catch (e: Exception) {
             if (e is CancellationException) throw e
@@ -138,6 +139,9 @@ fun ShortsScreen() {
         when {
             loading && items.isEmpty() -> CircularProgressIndicator(color = Color.White, modifier = Modifier.align(Alignment.Center))
             error != null && items.isEmpty() -> Box(Modifier.align(Alignment.Center)) { ErrorBox(error!!, onRetry = { retry++ }) }
+            items.isEmpty() -> Box(Modifier.align(Alignment.Center)) {
+                ErrorBox("No Shorts available yet. Try again.", onRetry = { retry++ })
+            }
             else -> {
                 val pager = rememberPagerState { items.size }
                 LaunchedEffect(pager, items) {
@@ -171,7 +175,9 @@ fun ShortsScreen() {
         Row(
             Modifier
                 .align(Alignment.TopStart)
-                .padding(top = LocalChrome.current.top - 56.dp, start = 16.dp),
+                .padding(top = LocalChrome.current.top - 56.dp, start = 16.dp)
+                .liquidGlass(RoundedCornerShape(24.dp), clear = true, tint = Color.Black.copy(alpha = 0.36f))
+                .padding(horizontal = 18.dp, vertical = 10.dp),
         ) {
             Text(
                 "Shorts",

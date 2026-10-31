@@ -1,5 +1,6 @@
 package com.gr4nt.itube.ui.screens
 
+import com.gr4nt.itube.data.regularVideos
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -101,7 +102,7 @@ fun ChannelScreen(url: String) {
         }
         return
     }
-    val tabs = d.tabs
+    val tabs = d.tabs.filterNot { ChannelTabs.SHORTS in it.contentFilters }
     val tab = tabs.getOrNull(tabIndex)
     val channel = ChannelItem(
         url = d.info.url,
@@ -114,7 +115,7 @@ fun ChannelScreen(url: String) {
         key = url to tabIndex,
         load = { if (tab != null) Repo.channelTab(tab) else PageResult(emptyList<Item>(), null) },
         contentPadding = PaddingValues(top = chrome.top, bottom = chrome.bottom),
-        large = tab?.contentFilters?.firstOrNull() != ChannelTabs.SHORTS,
+        large = true,
     ) {
         item {
             Column {
@@ -196,7 +197,7 @@ fun PlaylistScreen(url: String) {
                         color = c.secondaryLabel,
                     )
                     Spacer(Modifier.size(12.dp))
-                    val videos = firstPage?.items?.filterIsInstance<VideoItem>().orEmpty()
+                    val videos = firstPage?.items?.filterIsInstance<VideoItem>().orEmpty().regularVideos()
                     PlayAllRow(
                         onPlay = { videos.firstOrNull()?.let { app.openVideo(it, videos) } },
                         onShuffle = { videos.shuffled().let { s -> s.firstOrNull()?.let { app.openVideo(it, s) } } },
@@ -236,24 +237,25 @@ fun LocalListScreen(id: String) {
         modifier = Modifier.fillMaxSize(),
     ) {
         if (pl == null) return@LazyColumn
+        val videos = pl.videos.regularVideos()
         item {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Text(pl.name, style = MaterialTheme.typography.titleLarge, color = c.label, fontWeight = FontWeight.Bold)
-                Text("${pl.videos.size} videos", style = MaterialTheme.typography.bodySmall, color = c.secondaryLabel)
+                Text("${videos.size} videos", style = MaterialTheme.typography.bodySmall, color = c.secondaryLabel)
                 Spacer(Modifier.size(12.dp))
                 PlayAllRow(
-                    onPlay = { pl.videos.firstOrNull()?.let { app.openVideo(it, pl.videos) } },
-                    onShuffle = { pl.videos.shuffled().let { s -> s.firstOrNull()?.let { app.openVideo(it, s) } } },
+                    onPlay = { videos.firstOrNull()?.let { app.openVideo(it, videos) } },
+                    onShuffle = { videos.shuffled().let { s -> s.firstOrNull()?.let { app.openVideo(it, s) } } },
                 )
             }
         }
-        items(pl.videos, key = { it.url }) { v ->
-            VideoRow(v, pl.videos, trailing = {
+        items(videos, key = { it.url }) { v ->
+            VideoRow(v, videos, trailing = {
                 androidx.compose.material3.IconButton(onClick = { Store.removeFromPlaylist(id, v.url) }) {
                     Icon(Icons.Rounded.Close, "Remove", tint = c.secondaryLabel)
                 }
             })
         }
-        if (pl.videos.isEmpty()) item { com.gr4nt.itube.ui.components.EmptyBox("This playlist is empty", "Long-press any video to add it.") }
+        if (videos.isEmpty()) item { com.gr4nt.itube.ui.components.EmptyBox("This playlist is empty", "Long-press any video to add it.") }
     }
 }

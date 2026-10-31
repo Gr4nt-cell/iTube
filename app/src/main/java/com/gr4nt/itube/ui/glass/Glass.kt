@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -99,6 +100,10 @@ fun Modifier.liquidGlass(
     return this
         .depthShadow(shape, elevation)
         .then(glass)
+        .background(
+            Brush.verticalGradient(listOf(c.glassRim.copy(alpha = if (c.dark) 0.08f else 0.30f), Color.Transparent)),
+            shape,
+        )
         .then(if (!c.dark) Modifier.border(0.7.dp, Color.Black.copy(alpha = 0.10f), shape) else Modifier)
         .border(0.8.dp, rim, shape)
         .clip(shape)
@@ -116,7 +121,10 @@ fun Modifier.frosted(shape: RoundedCornerShape, elevation: Dp = 8.dp): Modifier 
     }
     return this
         .depthShadow(shape, elevation)
-        .background(c.elevated.copy(alpha = if (c.dark) 0.78f else 0.86f), shape)
+        .background(Brush.linearGradient(listOf(
+            c.elevated.copy(alpha = if (c.dark) 0.82f else 0.90f),
+            c.elevated.copy(alpha = if (c.dark) 0.62f else 0.68f),
+        )), shape)
         .then(if (!c.dark) Modifier.border(0.6.dp, Color.Black.copy(alpha = 0.08f), shape) else Modifier)
         .border(0.6.dp, rim, shape)
         .clip(shape)
@@ -185,7 +193,7 @@ fun GlassPill(
 fun GlassChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val c = AppTheme.colors
     val interaction = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(22.dp)
     val bg by animateColorAsState(if (selected) c.accent else c.elevated.copy(alpha = if (c.dark) 0.78f else 0.86f), label = "chipBg")
     val fg by animateColorAsState(if (selected) Color.White else c.label, label = "chipFg")
     val glow = if (selected) c.accent.copy(alpha = 0.7f) else c.shadow
@@ -193,7 +201,7 @@ fun GlassChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Mo
         contentAlignment = Alignment.Center,
         modifier = modifier
             .pressScale(interaction)
-            .height(36.dp)
+            .height(40.dp)
             .depthShadow(shape, if (selected) 10.dp else 6.dp, tint = if (selected) glow else null)
             .background(bg, shape)
             .border(0.6.dp, c.glassRim.copy(alpha = if (selected) 0.5f else 0.35f), shape)
@@ -224,18 +232,19 @@ fun GlassTabBar(
     modifier: Modifier = Modifier,
 ) {
     val c = AppTheme.colors
-    val shape = RoundedCornerShape(32.dp)
-    val lensShape = RoundedCornerShape(27.dp)
+    val shape = RoundedCornerShape(36.dp)
+    val lensShape = RoundedCornerShape(29.dp)
     val density = LocalDensity.current
     val haptics = LocalHapticFeedback.current
     val currentOnSelect by rememberUpdatedState(onSelect)
     val currentSelected by rememberUpdatedState(selected)
     BoxWithConstraints(
         modifier
+            .widthIn(max = 620.dp)
             .fillMaxWidth()
-            .height(64.dp)
+            .height(72.dp)
             .liquidGlass(shape, elevation = 20.dp)
-            .padding(5.dp),
+            .padding(6.dp),
     ) {
         val count = tabs.size.coerceAtLeast(1)
         val tabW = maxWidth / count
@@ -273,7 +282,7 @@ fun GlassTabBar(
                     scaleY = lens
                 }
                 .depthShadow(lensShape, if (dragging) 14.dp else 4.dp)
-                .background(c.label.copy(alpha = if (dragging) 0.16f else 0.09f), lensShape)
+                .background(c.label.copy(alpha = if (dragging) 0.14f else 0.06f), lensShape)
                 .border(
                     0.8.dp,
                     Brush.linearGradient(listOf(c.glassRim, c.glassRim.copy(alpha = 0.08f), c.glassRim.copy(alpha = 0.5f))),
@@ -303,7 +312,7 @@ fun GlassTabBar(
                 val tint by animateColorAsState(if (active) c.accent else c.label, label = "tabTint")
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
+                    verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()

@@ -1,5 +1,6 @@
 package com.gr4nt.itube.ui.screens
 
+import com.gr4nt.itube.data.regularVideos
 import android.app.Activity
 import android.content.Intent
 import android.text.Html
@@ -149,7 +150,7 @@ private fun WatchDetails(video: VideoItem, info: org.schabi.newpipe.extractor.st
     val showDislikes by Settings.showDislikes.collectAsState()
     var expanded by remember(video.url) { mutableStateOf(false) }
     var dislikes by remember(video.url) { mutableStateOf<Long?>(null) }
-    val related = remember(info) { info?.relatedItems?.toItems()?.filterIsInstance<VideoItem>().orEmpty() }
+    val related = remember(info) { info?.relatedItems?.toItems()?.filterIsInstance<VideoItem>().orEmpty().regularVideos() }
     val playlists by Store.playlists.collectAsState()
     val inWatchLater = playlists.firstOrNull { it.id == Store.WATCH_LATER }?.videos?.any { it.url == video.url } == true
 

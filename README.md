@@ -13,6 +13,7 @@ A native Android YouTube client with a Liquid Glass interface — no ads, no acc
 - **Picture-in-picture**
 - **Downloads**: video (up to 1080p MP4, higher in WebM on Android 10+) and audio-only (M4A/Opus), saved to `Downloads/iTube`, playable offline
 - **Library**: subscriptions feed (local, no login), watch history with resume, Watch later, custom playlists
+- **Shorts section**: Shorts stay out of regular discovery feeds, search results and autoplay queues; explicit Shorts links open the dedicated Shorts tab
 - **Liquid Glass UI**: refractive glass bars, buttons, sheets and player controls with depth shadows, in light and dark mode
 
 ## Build with GitHub

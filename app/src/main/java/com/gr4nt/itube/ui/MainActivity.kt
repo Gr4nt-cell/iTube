@@ -1,5 +1,6 @@
 package com.gr4nt.itube.ui
 
+import com.gr4nt.itube.ui.glass.GlassBackdrop
 import android.Manifest
 import android.app.PictureInPictureParams
 import android.content.Intent
@@ -139,7 +140,7 @@ class MainActivity : ComponentActivity() {
         when {
             Repo.isPlaylistUrl(url) && !url.contains("watch") -> app.push(Screen.Playlist(url))
             Repo.isChannelUrl(url) -> app.push(Screen.Channel(url))
-            else -> Repo.videoUrlFrom(url)?.let { app.openVideo(VideoItem(url = it, title = "", thumbnail = null)) }
+            else -> Repo.videoUrlFrom(url)?.let { app.openVideo(VideoItem(url = it, title = "", thumbnail = null, isShort = com.gr4nt.itube.data.isShortUrl(url))) }
         }
     }
 
@@ -259,7 +260,7 @@ private fun MainActivity.Root(app: AppState, onExit: () -> Unit) {
 
     LaunchedEffect(app.fullscreen) { setFullscreen(app.fullscreen) }
     LaunchedEffect(current) { if (current == null) { app.playerExpanded = false; app.fullscreen = false } }
-    SideEffect { setLightBars(!dark && !app.playerExpanded) }
+    SideEffect { setLightBars(!dark && !app.playerExpanded && app.current != Screen.Shorts) }
 
     ITubeTheme(dark) {
         CompositionLocalProvider(LocalAppState provides app) {
@@ -276,13 +277,15 @@ private fun MainActivity.Root(app: AppState, onExit: () -> Unit) {
             val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
             val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             val chrome = Chrome(
-                top = statusTop + 64.dp,
-                bottom = navBottom + 92.dp + if (current != null) 80.dp else 0.dp,
+                top = statusTop + if (app.current == Screen.Home || app.current == Screen.Subscriptions ||
+                    app.current == Screen.Downloads || app.current == Screen.Library) 126.dp else 64.dp,
+                bottom = navBottom + 100.dp + if (current != null) 80.dp else 0.dp,
             )
 
             Box(Modifier.fillMaxSize().background(c.background)) {
                 CompositionLocalProvider(LocalHazeState provides haze, LocalChrome provides chrome) {
                     Box(Modifier.fillMaxSize().hazeSource(haze)) {
+                        if (app.current != Screen.Shorts) GlassBackdrop()
                         Crossfade(targetState = app.current, label = "screen") { screen -> ScreenContent(screen) }
                     }
                     // Soft scrim so the floating header stays legible over content.
@@ -301,7 +304,11 @@ private fun MainActivity.Root(app: AppState, onExit: () -> Unit) {
                             .padding(start = 14.dp, end = 14.dp, bottom = 8.dp),
                     ) {
                         if (current != null && !app.playerExpanded && app.current != Screen.Shorts) MiniPlayer(Modifier.padding(bottom = 10.dp))
-                        GlassTabBar(tabs, app.tab, { app.selectTab(it) })
+                        if (app.current == Screen.Shorts) {
+                            ITubeTheme(dark = true) { GlassTabBar(tabs, app.tab, { app.selectTab(it) }) }
+                        } else {
+                            GlassTabBar(tabs, app.tab, { app.selectTab(it) })
+                        }
                     }
                 }
 
@@ -326,7 +333,7 @@ private fun MainActivity.Root(app: AppState, onExit: () -> Unit) {
 private fun ScreenContent(screen: Screen) {
     when (screen) {
         Screen.Home -> HomeScreen()
-        Screen.Shorts -> com.gr4nt.itube.ui.screens.ShortsScreen()
+        Screen.Shorts -> ITubeTheme(dark = true) { com.gr4nt.itube.ui.screens.ShortsScreen() }
         Screen.Subscriptions -> SubscriptionsScreen()
         Screen.Downloads -> DownloadsScreen()
         Screen.Library -> LibraryScreen()

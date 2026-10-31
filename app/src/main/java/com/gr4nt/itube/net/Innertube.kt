@@ -224,6 +224,18 @@ object Innertube {
         return if (id.startsWith("UC")) "https://www.youtube.com/channel/$id" else null
     }
 
+    private fun hasShortsMetadata(o: JSONObject): Boolean {
+        var short = false
+        walk(o) { key, value ->
+            if (key == "reelWatchEndpoint" || key == "shortsVideoEndpoint" ||
+                (key == "style" && value == "SHORTS") ||
+                (key == "url" && value is String && com.gr4nt.itube.data.isShortUrl(
+                    if (value.startsWith("/")) "https://www.youtube.com$value" else value
+                ))) short = true
+        }
+        return short
+    }
+
     private fun video(o: JSONObject): VideoItem? {
         val id = o.optString("videoId").takeIf { it.isNotEmpty() } ?: return null
         val badges = o.optJSONArray("badges")?.toString().orEmpty()
@@ -240,6 +252,7 @@ object Innertube {
             views = parseCount(text(o.opt("viewCountText")) ?: text(o.opt("shortViewCountText"))),
             uploaded = text(o.opt("publishedTimeText")),
             isLive = badges.contains("LIVE") || length.equals("LIVE", true),
+            isShort = hasShortsMetadata(o),
         )
     }
 
@@ -284,6 +297,7 @@ object Innertube {
                 views = parseCount(rows.firstOrNull { it.contains("view", true) }),
                 uploaded = rows.firstOrNull { it.contains("ago", true) },
                 isLive = badge.equals("LIVE", true),
+                isShort = hasShortsMetadata(o),
             )
         }
     }

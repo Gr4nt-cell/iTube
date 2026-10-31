@@ -1,5 +1,7 @@
 package com.gr4nt.itube.ui.components
 
+import androidx.compose.runtime.rememberUpdatedState
+import com.gr4nt.itube.data.regularPage
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -351,12 +353,14 @@ fun PagedList(
     var token by remember(key) { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
+    val activeRequest by rememberUpdatedState(key to token)
 
     LaunchedEffect(key, token) {
         loading = true
+        next = null
         error = null
         try {
-            val r = load()
+            val r = load().regularPage()
             items = r.items
             next = r.next
         } catch (e: Exception) {
@@ -367,7 +371,7 @@ fun PagedList(
         refreshing = false
     }
 
-    LaunchedEffect(listState, key) {
+    LaunchedEffect(listState, key, next, loading) {
         snapshotFlow {
             val info = listState.layoutInfo
             (info.visibleItemsInfo.lastOrNull()?.index ?: 0) >= info.totalItemsCount - 5
@@ -375,16 +379,19 @@ fun PagedList(
             val n = next
             if (nearEnd && n != null && !loading) {
                 loading = true
+                val request = key to token
                 scope.launch {
                     try {
-                        val r = n()
-                        items = items + r.items
-                        next = r.next
+                        val r = n().regularPage()
+                        if (activeRequest == request) {
+                            items = items + r.items
+                            next = r.next
+                        }
                     } catch (e: Exception) {
                         if (e is CancellationException) throw e
-                        next = null
+                        if (activeRequest == request) next = null
                     }
-                    loading = false
+                    if (activeRequest == request) loading = false
                 }
             }
         }

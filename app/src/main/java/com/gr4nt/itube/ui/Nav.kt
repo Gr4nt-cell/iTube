@@ -1,5 +1,7 @@
 package com.gr4nt.itube.ui
 
+import com.gr4nt.itube.data.regularVideos
+import com.gr4nt.itube.data.isShortContent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -44,6 +46,7 @@ class AppState {
     val stacks = roots.map { mutableStateListOf<Screen>(it) }
 
     var tab by mutableIntStateOf(0)
+    var shortsSeed by mutableStateOf<VideoItem?>(null)
     var playerExpanded by mutableStateOf(false)
     var fullscreen by mutableStateOf(false)
     var inPip by mutableStateOf(false)
@@ -77,7 +80,14 @@ class AppState {
     }
 
     fun openVideo(video: VideoItem, queue: List<VideoItem>? = null) {
-        if (PlaybackEngine.current.value?.url != video.url) PlaybackEngine.play(video, queue)
+        if (video.isShortContent) {
+            PlaybackEngine.player.pause()
+            playerExpanded = false
+            shortsSeed = video.copy(isShort = true)
+            selectTab(1)
+            return
+        }
+        if (PlaybackEngine.current.value?.url != video.url) PlaybackEngine.play(video, queue?.regularVideos())
         playerExpanded = true
     }
 

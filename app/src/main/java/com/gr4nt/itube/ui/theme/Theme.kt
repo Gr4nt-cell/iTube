@@ -30,36 +30,42 @@ data class AppColors(
     val glassRim: Color,
     val shadow: Color,
     val chip: Color,
+    val glowPrimary: Color,
+    val glowSecondary: Color,
 )
 
 private val Light = AppColors(
     dark = false,
-    background = Color(0xFFF2F2F7),
+    background = Color(0xFFF8F6FB),
     elevated = Color(0xFFFFFFFF),
-    label = Color(0xFF000000),
-    secondaryLabel = Color(0x993C3C43),
-    tertiaryLabel = Color(0x4D3C3C43),
+    label = Color(0xFF171B2E),
+    secondaryLabel = Color(0xFF62677C),
+    tertiaryLabel = Color(0xFF7F8498),
     separator = Color(0x293C3C43),
-    accent = Color(0xFFFF2D55),
-    glassTint = Color(0x8CFFFFFF),
+    accent = Color(0xFFCB204B),
+    glassTint = Color(0xA6FFFFFF),
     glassRim = Color(0xCCFFFFFF),
-    shadow = Color(0x40000000),
-    chip = Color(0x14000000),
+    shadow = Color(0x202C2046),
+    chip = Color(0x0F332352),
+    glowPrimary = Color(0xFFF1DCEF),
+    glowSecondary = Color(0xFFDBEAF9),
 )
 
 private val Dark = AppColors(
     dark = true,
-    background = Color(0xFF000000),
-    elevated = Color(0xFF1C1C1E),
+    background = Color(0xFF0C0F1C),
+    elevated = Color(0xFF191D30),
     label = Color(0xFFFFFFFF),
-    secondaryLabel = Color(0x99EBEBF5),
-    tertiaryLabel = Color(0x4DEBEBF5),
+    secondaryLabel = Color(0xFFB4B9CE),
+    tertiaryLabel = Color(0xFF929AB5),
     separator = Color(0x3D545458),
-    accent = Color(0xFFFF375F),
-    glassTint = Color(0x8C2C2C2E),
+    accent = Color(0xFFDA3059),
+    glassTint = Color(0xB31B2035),
     glassRim = Color(0x59FFFFFF),
     shadow = Color(0xB3000000),
     chip = Color(0x24FFFFFF),
+    glowPrimary = Color(0xFF35203D),
+    glowSecondary = Color(0xFF172F46),
 )
 
 val LocalAppColors = staticCompositionLocalOf { Light }
@@ -76,8 +82,8 @@ fun isDark(mode: ThemeMode): Boolean = when (mode) {
 }
 
 private val Type = Typography(
-    headlineLarge = TextStyle(fontSize = 32.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.2.sp),
-    headlineSmall = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold),
+    headlineLarge = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp),
+    headlineSmall = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.6).sp),
     titleLarge = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold),
     titleMedium = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.SemiBold),
     titleSmall = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),

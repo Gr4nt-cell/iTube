@@ -182,8 +182,7 @@ object Repo {
 
         // Anything that is a Short goes to the Shorts tab, never Trending.
         val (feedShorts, longs) = uploads.partition { v ->
-            v.isShort || (v.durationSec in 1..60) || videoId(v.url) in shortIds ||
-                v.title.contains("#shorts", ignoreCase = true)
+            v.isShortContent || videoId(v.url) in shortIds
         }
         val windowMs = 10L * 24 * 3_600_000
         val recentShorts = (feedShorts.map { it.copy(isShort = true) } + shorts).distinctBy { videoId(it.url) }
@@ -203,14 +202,14 @@ object Repo {
         val max = lists.maxOfOrNull { it.size } ?: 0
         for (i in 0 until max) lists.forEach { l -> l.getOrNull(i)?.let(out::add) }
         val all = out.distinctBy { it.url }
-        val (shorts, longs) = all.partition { it.isShort || it.durationSec in 1..60 }
+        val (shorts, longs) = all.partition { it.isShortContent }
         trendingShorts = shorts.map { it.copy(isShort = true) }
         longs
     }
 
     // ---------------- Shorts ----------------
 
-    private fun isShortLike(v: VideoItem) = !v.isLive && (v.isShort || v.durationSec in 1..180)
+    private fun isShortLike(v: VideoItem) = !v.isLive && v.isShortContent
 
     private val shortQueries = listOf("#shorts", "shorts funny", "shorts music", "shorts trending", "shorts gaming", "shorts sports")
 
