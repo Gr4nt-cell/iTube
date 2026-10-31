@@ -6,12 +6,26 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-// Release signing: GitHub secrets win; otherwise the bundled keystore keeps updates installable.
-val envKeystore = System.getenv("ITUBE_KEYSTORE_FILE")
-val keystoreFile = if (!envKeystore.isNullOrBlank()) file(envKeystore) else rootProject.file("keystore/itube-release.jks")
-val keystorePass = System.getenv("ITUBE_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() } ?: "itube-release-2026"
-val keyAliasName = System.getenv("ITUBE_KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "itube"
-val keyPass = System.getenv("ITUBE_KEY_PASSWORD")?.takeIf { it.isNotBlank() } ?: keystorePass
+// Release signing material is supplied only through protected CI environment variables.
+val keystoreFile = System.getenv("ITUBE_KEYSTORE_FILE")
+    ?.takeIf { it.isNotBlank() }
+    ?.let(::file)
+val keystorePass = System.getenv("ITUBE_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
+val keyAliasName = System.getenv("ITUBE_KEY_ALIAS")?.takeIf { it.isNotBlank() }
+val keyPass = System.getenv("ITUBE_KEY_PASSWORD")?.takeIf { it.isNotBlank() }
+val releaseSigningConfigured = keystoreFile?.isFile == true &&
+    !keystorePass.isNullOrBlank() &&
+    !keyAliasName.isNullOrBlank() &&
+    !keyPass.isNullOrBlank()
+val releaseTaskRequested = gradle.startParameter.taskNames.any {
+    it.contains("release", ignoreCase = true)
+}
+if (releaseTaskRequested && !releaseSigningConfigured) {
+    throw GradleException(
+        "Release signing requires ITUBE_KEYSTORE_FILE, ITUBE_KEYSTORE_PASSWORD, " +
+            "ITUBE_KEY_ALIAS, and ITUBE_KEY_PASSWORD."
+    )
+}
 // GitHub Actions run number, or Codemagic build number offset past the GitHub builds.
 val ciVersionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
     ?: System.getenv("BUILD_NUMBER")?.toIntOrNull()?.let { it + 100 }
@@ -31,10 +45,12 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = keystoreFile
-            storePassword = keystorePass
-            keyAlias = keyAliasName
-            keyPassword = keyPass
+            if (releaseSigningConfigured) {
+                storeFile = keystoreFile
+                storePassword = keystorePass
+                keyAlias = keyAliasName
+                keyPassword = keyPass
+            }
         }
     }
 

@@ -27,6 +27,14 @@ workflows:
           yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
       - name: Build release APK
         script: |
+          set -euo pipefail
+          : "${ITUBE_KEYSTORE_BASE64:?Configure ITUBE_KEYSTORE_BASE64 as a secure Codemagic variable}"
+          : "${ITUBE_KEYSTORE_PASSWORD:?Configure ITUBE_KEYSTORE_PASSWORD as a secure Codemagic variable}"
+          : "${ITUBE_KEY_ALIAS:?Configure ITUBE_KEY_ALIAS as a secure Codemagic variable}"
+          : "${ITUBE_KEY_PASSWORD:?Configure ITUBE_KEY_PASSWORD as a secure Codemagic variable}"
+          printf '%s' "$ITUBE_KEYSTORE_BASE64" | base64 --decode > "$CM_BUILD_DIR/release.jks"
+          chmod 600 "$CM_BUILD_DIR/release.jks"
+          export ITUBE_KEYSTORE_FILE="$CM_BUILD_DIR/release.jks"
           chmod +x gradlew
           ./gradlew --stacktrace assembleRelease
       - name: Name the APK

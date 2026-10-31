@@ -27,14 +27,21 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Decode signing key (optional secret)
+      - name: Decode signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.ITUBE_KEYSTORE_BASE64 }}
+          ITUBE_KEYSTORE_PASSWORD: ${{ secrets.ITUBE_KEYSTORE_PASSWORD }}
+          ITUBE_KEY_ALIAS: ${{ secrets.ITUBE_KEY_ALIAS }}
+          ITUBE_KEY_PASSWORD: ${{ secrets.ITUBE_KEY_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
-            echo "ITUBE_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
-          fi
+          set -euo pipefail
+          : "${KEYSTORE_BASE64:?Set ITUBE_KEYSTORE_BASE64 in repository Actions secrets}"
+          : "${ITUBE_KEYSTORE_PASSWORD:?Set ITUBE_KEYSTORE_PASSWORD in repository Actions secrets}"
+          : "${ITUBE_KEY_ALIAS:?Set ITUBE_KEY_ALIAS in repository Actions secrets}"
+          : "${ITUBE_KEY_PASSWORD:?Set ITUBE_KEY_PASSWORD in repository Actions secrets}"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          chmod 600 "$RUNNER_TEMP/release.jks"
+          printf 'ITUBE_KEYSTORE_FILE=%s\n' "$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
       - name: Build release APK
         env:

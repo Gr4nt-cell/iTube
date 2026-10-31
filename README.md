@@ -18,17 +18,24 @@ A native Android YouTube client with a Liquid Glass interface — no ads, no acc
 
 ## Build with GitHub
 
-Every push to `main` runs **Actions → Build APK**, which:
+Run **Actions → Build APK** manually to:
 
 1. builds a signed release APK,
 2. uploads it as the `iTube-apk` artifact, and
 3. publishes it on the repository's **Releases** page (pushing a tag like `v1.0.0` makes a full release).
 
-Download the APK from Releases on your phone and install it.
+The workflow uploads an APK artifact and publishes a prerelease. Codemagic also builds on pushes to `main` and tags.
 
 ### Signing
 
-The repo ships with a signing key in `keystore/` so every build installs over the previous one. If the repository is public, replace it with your own key stored in GitHub secrets: `ITUBE_KEYSTORE_BASE64` (base64 of the .jks), `ITUBE_KEYSTORE_PASSWORD`, `ITUBE_KEY_ALIAS`, `ITUBE_KEY_PASSWORD`.
+Release signing material is not stored in this repository. Configure these protected variables in GitHub Actions repository secrets:
+
+- `ITUBE_KEYSTORE_BASE64`: base64-encoded release keystore
+- `ITUBE_KEYSTORE_PASSWORD`
+- `ITUBE_KEY_ALIAS`
+- `ITUBE_KEY_PASSWORD`
+
+The Codemagic workflow requires the same four names configured as secure environment variables in Codemagic. Release builds fail if signing is not configured; debug builds do not require release credentials. Never commit the keystore or print signing values in build logs.
 
 ## Tech
 
