@@ -43,12 +43,12 @@ private val Light = AppColors(
     tertiaryLabel = Color(0xFF7F8498),
     separator = Color(0x293C3C43),
     accent = Color(0xFFCB204B),
-    glassTint = Color(0xA6FFFFFF),
+    glassTint = Color(0x59FFFFFF),
     glassRim = Color(0xCCFFFFFF),
     shadow = Color(0x202C2046),
     chip = Color(0x0F332352),
-    glowPrimary = Color(0xFFF1DCEF),
-    glowSecondary = Color(0xFFDBEAF9),
+    glowPrimary = Color(0xFFF6A6C8),
+    glowSecondary = Color(0xFF9CCBFA),
 )
 
 private val Dark = AppColors(
@@ -60,12 +60,12 @@ private val Dark = AppColors(
     tertiaryLabel = Color(0xFF929AB5),
     separator = Color(0x3D545458),
     accent = Color(0xFFDA3059),
-    glassTint = Color(0xB31B2035),
+    glassTint = Color(0x661B2035),
     glassRim = Color(0x59FFFFFF),
     shadow = Color(0xB3000000),
     chip = Color(0x24FFFFFF),
-    glowPrimary = Color(0xFF35203D),
-    glowSecondary = Color(0xFF172F46),
+    glowPrimary = Color(0xFF7A2450),
+    glowSecondary = Color(0xFF1C4C86),
 )
 
 val LocalAppColors = staticCompositionLocalOf { Light }

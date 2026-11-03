@@ -95,7 +95,7 @@ fun Modifier.liquidGlass(
     val glass = if (state != null) {
         Modifier.hazeGlass(input = HazeInput.Sources(state), style = style)
     } else {
-        Modifier.background(c.elevated.copy(alpha = 0.94f), shape)
+        Modifier.background(c.elevated.copy(alpha = if (c.dark) 0.50f else 0.55f), shape)
     }
     return this
         .depthShadow(shape, elevation)
@@ -122,8 +122,8 @@ fun Modifier.frosted(shape: RoundedCornerShape, elevation: Dp = 8.dp): Modifier 
     return this
         .depthShadow(shape, elevation)
         .background(Brush.linearGradient(listOf(
-            c.elevated.copy(alpha = if (c.dark) 0.82f else 0.90f),
-            c.elevated.copy(alpha = if (c.dark) 0.62f else 0.68f),
+            c.elevated.copy(alpha = if (c.dark) 0.46f else 0.52f),
+            c.elevated.copy(alpha = if (c.dark) 0.26f else 0.30f),
         )), shape)
         .then(if (!c.dark) Modifier.border(0.6.dp, Color.Black.copy(alpha = 0.08f), shape) else Modifier)
         .border(0.6.dp, rim, shape)
@@ -194,7 +194,7 @@ fun GlassChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Mo
     val c = AppTheme.colors
     val interaction = remember { MutableInteractionSource() }
     val shape = RoundedCornerShape(22.dp)
-    val bg by animateColorAsState(if (selected) c.accent else c.elevated.copy(alpha = if (c.dark) 0.78f else 0.86f), label = "chipBg")
+    val bg by animateColorAsState(if (selected) c.accent else c.elevated.copy(alpha = if (c.dark) 0.42f else 0.48f), label = "chipBg")
     val fg by animateColorAsState(if (selected) Color.White else c.label, label = "chipFg")
     val glow = if (selected) c.accent.copy(alpha = 0.7f) else c.shadow
     Box(

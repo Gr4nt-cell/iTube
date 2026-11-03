@@ -24,5 +24,11 @@ fun GlassBackdrop() {
             center = Offset(size.width, size.height * 0.66f),
             radius = size.width * 1.2f,
         ))
+        // accent bloom low on the screen so lists and the tab bar pick up colour too
+        drawRect(Brush.radialGradient(
+            listOf(c.accent.copy(alpha = if (c.dark) 0.30f else 0.22f), Color.Transparent),
+            center = Offset(size.width * 0.15f, size.height * 0.95f),
+            radius = size.width * 0.95f,
+        ))
     }
 }
